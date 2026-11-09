@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="1.12.1">
+<meta name="version" content="1.12.2">
 <title>Conformality User Guide</title>
 <link rel="icon" href="./favicon.svg" type="image/svg+xml">
 <link rel="icon" href="./favicon.ico" sizes="48x48">
@@ -21,6 +21,9 @@
   nav.toc b { display:block; margin-bottom:8px; font-size:13px; letter-spacing:.04em; text-transform:uppercase; color:var(--muted); }
   nav.toc a { display:block; padding:4px 0; color:var(--muted); text-decoration:none; }
   nav.toc a:hover { color:var(--ink); }
+  nav.toc .grp { display:block; margin:14px 0 2px; font-size:11px; letter-spacing:.05em; text-transform:uppercase; color:var(--ink); font-weight:700; }
+  .part { margin:56px 0 -28px; padding:10px 14px; background:var(--card); border:1px solid var(--line); border-left:4px solid #0f766e; border-radius:8px; font-size:.92rem; color:var(--muted); }
+  .part b { display:block; color:var(--ink); font-size:1.05rem; }
   main { padding:28px 0 80px; min-width:0; }
   h1 { font-size:2rem; margin:0 0 4px; }
   h2 { font-size:1.45rem; margin:48px 0 8px; padding-top:12px; border-top:1px solid var(--line); }
@@ -53,18 +56,22 @@
 <nav class="toc" aria-label="Contents">
   <b>Contents</b>
   <a href="#start">Start here</a>
-  <a href="#example">Worked example</a>
+  <span class="grp">Everyday and conflict minerals</span>
   <a href="#today">Dashboard</a>
   <a href="#suppliers">Suppliers</a>
-  <a href="#skus">Products (SKUs)</a>
   <a href="#requests">Document requests</a>
   <a href="#minerals">CMRT check</a>
-  <a href="#screening">Screening</a>
-  <a href="#trade">Orders, classification and trade rules</a>
   <a href="#review">Documents</a>
+  <a href="#portal">Supplier portal</a>
   <a href="#govdata">Government data</a>
   <a href="#audit">Audit log</a>
-  <a href="#portal">Supplier portal</a>
+  <span class="grp">Restricted party screening</span>
+  <a href="#screening">Screening</a>
+  <span class="grp">Trade compliance</span>
+  <a href="#skus">Products (SKUs)</a>
+  <a href="#trade">Orders, classification and trade rules</a>
+  <a href="#example">Worked example (an order)</a>
+  <span class="grp">Reference</span>
   <a href="#routines">Routines</a>
   <a href="#admin">Admin notes</a>
   <a href="#glossary">Glossary</a>
@@ -73,12 +80,14 @@
 
 <main>
 <h1>Conformality User Guide</h1>
-<p style="color:var(--muted);font-size:.9rem;margin:0 0 12px">Guide version 1.12.1 · Updated 28 Oct 2026 · Applies to app version 1.12.1 (shown next to the name in the app's top bar) · <a href="./index.html" style="color:inherit">Open the app</a></p>
+<p style="color:var(--muted);font-size:.9rem;margin:0 0 12px">Guide version 1.12.2 · Updated 9 Nov 2026 · Applies to app version 1.12.1 (shown next to the name in the app's top bar) · <a href="./index.html" style="color:inherit">Open the app</a></p>
 <p class="lead">Conformality is our in-house tool for proving that we know who our suppliers and customers are, what we sell, and where it goes. It collects evidence, flags problems, records who decided what, and keeps the history so it can be shown to an auditor or customer.</p>
 
 <div class="warn"><b>Important.</b> This tool organizes work and records decisions. It does not give legal advice and it does not decide whether an export licence is required. When a result is unclear, or a match is confirmed, involve your compliance lead or legal counsel.</div>
 
 <h2 id="start">Start here</h2>
+
+<div class="tip"><b>How this guide is organised.</b> It follows the app and its Features page. <b>Part 1</b> covers everyday work and conflict minerals (CMRT) and is always on. <b>Part 2</b> covers restricted party screening. <b>Part 3</b> covers trade compliance (export and import: products, orders, classifications, customers, rules, customs records). If your administrator has turned a feature off, skip its part.</div>
 
 <h3>The four jobs the app does</h3>
 <table>
@@ -149,35 +158,8 @@
   <li><b>Dashboard:</b> work through whatever it lists.</li>
 </ol>
 
-<!-- ============ WORKED EXAMPLE ============ -->
-<h2 id="example">Worked example: one order from start to finish</h2>
-<div class="purpose"><b>Purpose</b>Shows how the pieces fit together by following one pretend order. All names are made up. Do the same steps with your own data and the rest of this guide will make sense.</div>
-<p>We sell a sensor, <b>XYZ-2</b>, made by our supplier <b>Brightline Electronics</b>. A new Canadian customer, <b>Prairie Harvest Equipment</b>, orders two units. Order number <b>SO-1042</b>.</p>
-<table>
-  <tr><th style="width:5%">#</th><th style="width:30%">What you do</th><th>Where</th><th style="width:30%">Why it matters</th></tr>
-  <tr><td>1</td><td>Add Prairie Harvest as a customer, with a contact person.</td><td>Configuration &gt; Customers</td><td>Only parties that exist in the app can be screened and put on orders.</td></tr>
-  <tr><td>2</td><td>Press <span class="btn">EUS</span>, then <i>Send signing link</i>. The contact signs on a web page.</td><td>Configuration &gt; Customers</td><td>The signed end user statement is the customer's promise about who will use the products and where. Many export rules expect it.</td></tr>
-  <tr><td>3</td><td>Screen Prairie Harvest against the government lists. No match, so nothing more to do.</td><td>Screening</td><td>Proves you checked before selling, and which list version you used.</td></tr>
-  <tr><td>4</td><td>Classify XYZ-2: jurisdiction EAR, ECCN <i>EAR99</i>, source <i>Supplier stated</i>, short rationale, then approve.</td><td>Configuration &gt; Classifications</td><td>The classification says how strictly the product is controlled. It is recorded once and reused for every order.</td></tr>
-  <tr><td>5</td><td>Create order SO-1042: customer, destination CA, item XYZ-2 x 2. Press <span class="btn">Screen order</span>.</td><td>Orders</td><td>The app checks the parties, destination and items together.</td></tr>
-  <tr><td>6</td><td>The order is <span class="b a">On hold</span>: <i>License determination not recorded</i>. Open it, press <i>Record</i>, choose <i>No license required (NLR)</i>, and write why (for example "All items EAR99, customer signed EUS"). The order moves to <span class="b g">Cleared</span>, with a note that the purchase order is still missing.</td><td>Order file</td><td>A person, not the app, decides whether a licence is needed. The app only makes sure that decision exists before shipping.</td></tr>
-  <tr><td>7</td><td>Attach the customer's purchase order. The note disappears and the order file shows this item as done.</td><td>Order file &gt; Attach document</td><td>Documents on the order become part of the evidence file.</td></tr>
-  <tr><td>8</td><td>Ship. Enter the ship date and attach the invoice and shipping documents.</td><td>Order file</td><td>The ship date starts the record-keeping clock (five years in this version, to be confirmed with counsel).</td></tr>
-  <tr><td>9</td><td>Years later, an auditor asks about SO-1042. Open the order and press <span class="btn">Download order file</span>.</td><td>Order file</td><td>One zip file holds the screening record, the classification as it was then, the signed statement and every document.</td></tr>
-</table>
-<div class="example"><b class="l">What if something goes wrong?</b>At step 3, suppose the screening finds a <b>possible match</b>: a listed company with a similar name. That does <b>not</b> mean your customer is on a list. Names are matched loosely on purpose so nothing slips through, and most matches are different companies. Open the match, compare the country, address and other details, decide "same party" or "not the same party", and write what you looked at. If you are unsure, do not guess: leave it unresolved and ask your compliance lead. Orders for that customer stay on hold until the match is decided.</div>
+<div class="part"><b>Part 1 · Everyday work and conflict minerals</b>Always on, whatever the Features page says. Start here if you only handle conflict minerals (CMRT) and supplier paperwork.</div>
 
-<h3>Questions beginners often ask</h3>
-<table>
-  <tr><th style="width:34%">Question</th><th>Answer</th></tr>
-  <tr><td>Do I need to know what an ECCN or EAR99 is?</td><td>No. You record what your supplier, compliance lead or counsel tells you. The app stores who decided, what they decided and why. The glossary at the end explains the terms if you are curious.</td></tr>
-  <tr><td>A screening match came up. Is the customer on a list?</td><td>Probably not. Names are matched loosely, so most possible matches are different companies. You compare the details, decide, and write down why.</td></tr>
-  <tr><td>I made a mistake. Can I delete it?</td><td>Usually not, on purpose. Evidence cannot be changed or removed. Correct it by adding a new version or a note, and deactivate things instead of deleting them. The history of the correction is part of the record.</td></tr>
-  <tr><td>What if I am not sure?</td><td>Leave it on hold and ask your compliance lead or counsel. The app is built so that "hold and ask" is cheap and shipping by mistake is hard.</td></tr>
-  <tr><td>What does the app not do?</td><td>It does not decide whether a licence is needed, whether a product meets the Trade Agreements Act, or whether a purchase order is a standard FAR Part 12 order. It makes sure a person has decided, and keeps the evidence.</td></tr>
-</table>
-
-<!-- ============ DASHBOARD ============ -->
 <h2 id="today">Dashboard</h2>
 <div class="purpose"><b>Purpose</b>Your to-do list. It gathers everything across the app that needs a person, sorted by urgency. If you only open one page each day, make it this one. It used to be called Today.</div>
 <div class="example"><b class="l">Example (made-up names)</b>On Monday morning you open the Dashboard and see three things: <i>Screen Meridian Trading (never screened)</i>, <i>End user statement expires soon: Prairie Harvest</i> and <i>Tariff codes and programs needs updating</i>. You work down the list: screen the company, send Prairie Harvest a new signing link, review the tariff notices and press <i>I checked this</i>. Ten minutes, and you did not have to remember three different deadlines.</div>
@@ -210,7 +192,6 @@
 </table>
 <div class="tip">Items disappear when the underlying work is done. For example, a "Screen &lt;supplier&gt;" item clears after you screen that supplier, not when you tick something in Review.</div>
 
-<!-- ============ SUPPLIERS ============ -->
 <h2 id="suppliers">Suppliers <small>(Configuration menu)</small></h2>
 <h3>The supplier page</h3>
 <p>Click a supplier's name (or <b>Open</b>) in the Suppliers list to see everything about that supplier on one page.</p>
@@ -239,7 +220,6 @@
   <li><span class="btn">Edit</span> fixes a name, country, address or notes, and holds the supplier's single contact (name, email, optional phone and job title). A supplier can only be asked for documents once it has a contact. Inside it, <b>Deactivate</b> hides a supplier you no longer use (nothing is deleted, and it stops being re-screened), and an admin can <b>Merge into another...</b>.</li>
 </ul>
 
-<!-- ============ SKUS ============ -->
 <h3>Fixing a duplicate or misnamed supplier</h3>
 <ul>
   <li><b>Misspelled or wrong name:</b> click Edit and correct it.</li>
@@ -247,16 +227,7 @@
   <li><b>A supplier you no longer use:</b> Edit, then Deactivate. Find it again under "Inactive suppliers" at the bottom of the page, where you can Reactivate it.</li>
   <li>Merge is blocked if the wrong supplier has screening matches still waiting for a decision. Decide them on the supplier's Screening tab first. It needs database part 13.</li>
 </ul>
-<h2 id="skus">Products (SKUs) <small>(Configuration menu, Trade compliance section)</small></h2>
-<div class="purpose"><b>Purpose</b>Our product catalogue. A product (SKU, stock keeping unit) is one sellable part number. This page is part of Trade compliance and is hidden when that feature is off. Linking each product (SKU) to its supplier lets us answer a customer's question "is part X conflict-minerals compliant?" by looking up the supplier's current form.</div>
-<div class="example"><b class="l">Example (made-up names)</b>A customer asks: "Is part XYZ-2 conflict-minerals compliant?" You search XYZ-2, see it is made by Brightline Electronics, and open Brightline's current declaration. Without the part-to-supplier link you would be digging through old emails.</div>
-<ul>
-  <li>Search by product (SKU), description or supplier.</li>
-  <li><span class="btn">+ Add product (SKU)</span> adds one part.</li>
-  <li><span class="btn">Import CSV</span> adds many. Columns: <code>sku</code> and <code>supplier</code> (required, supplier name must match exactly), plus optional <code>description</code> and <code>supplier part number</code>. Existing SKUs are updated, not duplicated. Rows with an unrecognized supplier are skipped and listed.</li>
-</ul>
 
-<!-- ============ REQUESTS ============ -->
 <h2 id="requests">Document requests <small>(supplier page &gt; Documents &amp; requests)</small></h2>
 <div class="purpose"><b>Purpose</b>Tracks every document we have asked a supplier for, so nothing is forgotten and there is a record that we asked.</div>
 <div class="example"><b class="l">Example (made-up names)</b>You need Brightline's declaration for this year. You create a request, send the private link, and Brightline uploads the form without needing an account. Two weeks pass with no reply, so the request turns <i>Overdue</i> and appears on Today. You press Remind. Months later a customer asks "did you ever ask them?" and the request history is your proof.</div>
@@ -268,7 +239,6 @@
   <li>Status: <span class="b a">Sent</span>, <span class="b a">Reminded</span>, <span class="b r">Overdue</span> (past the due date), <span class="b g">Received</span>.</li>
 </ul>
 
-<!-- ============ MINERALS ============ -->
 <h2 id="minerals">CMRT check <small>(Dashboard tile; flags on the supplier's Smelters tab)</small></h2>
 <div class="purpose"><b>Purpose</b>Reads each supplier's conflict minerals form and checks every smelter on it against the official conformant list, so you only have to look at the exceptions.</div>
 <div class="example"><b class="l">Example (made-up names)</b>Brightline's form lists 40 smelters. The app reads it and finds 38 on the conformant list, one that is not listed, and one whose name it cannot match. You only look at those two: ask Brightline about the unlisted smelter, or record your decision and why. Without the app you would check all 40 by hand.</div>
@@ -305,7 +275,53 @@
 <p>The <b>More ▾</b> menu offers: all declared smelters, re-check against a newer list, re-read the original file, and archive (with a reason) or restore.</p>
 <div class="tip">After a document is checked, go to <b>Review</b> to accept, accept with gaps, or reject the document itself. Checking smelters and accepting the document are two separate decisions.</div>
 
-<!-- ============ SCREENING ============ -->
+<h2 id="review">Documents <small>(supplier page &gt; Documents &amp; requests)</small></h2>
+<div class="purpose"><b>Purpose</b>The inbox for everything suppliers send us. Nothing a supplier uploads counts until a person accepts it.</div>
+<div class="example"><b class="l">Example (made-up names)</b>Brightline uploads a conflict minerals form. It sits in Review until you open it, check it is the right file and year, and press Accept. Until then it does not count. That stops a wrong file, or a form from last year, from quietly passing as this year's declaration.</div>
+<h3>Documents to review</h3>
+<p>Each uploaded document shows the supplier, type, upload date and a SHA-256 "fingerprint" that proves the file has not changed since upload. For conflict minerals forms it also shows how many smelters need attention. Buttons: <span class="btn">View</span>, <span class="btn">Open file</span>, and then one decision:</p>
+<table>
+  <tr><th style="width:26%">Decision</th><th>Use when</th></tr>
+  <tr><td><span class="b g">Accept</span></td><td>The document is complete and usable.</td></tr>
+  <tr><td><span class="b a">Accept with gaps</span></td><td>Usable but incomplete. A note records what is missing.</td></tr>
+  <tr><td><span class="b r">Reject</span></td><td>Unusable. The supplier will need to send another.</td></tr>
+</table>
+<h3>Ownership forms <small>(supplier page &gt; Screening)</small></h3>
+<p>Suppliers can certify who owns them. Ownership matters because sanctions rules (for example OFAC's "50 percent rule") can apply to a company owned by listed parties even when the company itself is not listed. Review the named owners, then <span class="btn">Accept &amp; screen owners</span> (the owners are added and screened) or <span class="btn">Send back</span>.</p>
+
+<h2 id="portal">The supplier portal (what suppliers see)</h2>
+<div class="purpose"><b>Purpose</b>A simple page where suppliers upload what we asked for, without needing an account or password.</div>
+<ul>
+  <li>The supplier opens the private link you sent, sees what is requested, and uploads the file. Some requests also ask them to certify ownership.</li>
+  <li>Links expire. Each is tied to one supplier and one request. If a link expires or is lost, use <span class="btn">Remind</span> on Requests to make a fresh one.</li>
+  <li>Uploads appear in <b>Review</b>. Suppliers see only their own request, never other data in the app.</li>
+</ul>
+
+<h3>Customers signing an end user statement</h3>
+<p>Customers get a different private link, which opens the end user statement page instead of an upload page. They read it, fill in the end user and end use, sign, and see a confirmation they can print. Nothing else in the app is visible to them.</p>
+
+<h2 id="govdata">Government data <small>(Configuration menu)</small></h2>
+<p>One page for the outside information the app depends on: the restricted party list, the smelter list, tariff codes, export control rules, your destination country list, the end user statement wording and the form version. The table shows when each was last updated, when it is next due, and whether it is current.</p>
+<ul>
+  <li><b>Lists that come from a file</b> (screening list, smelter list): download the file, then use the <b>Load list</b> button on that list's row in the table and pick it. This is the only place lists are loaded; the Dashboard and the supplier pages only show when each list was last loaded.</li>
+  <li><b>Things a person reviews</b> (tariff codes, export control rules, country list, statement wording, form version): click <b>I checked this</b> and write what you checked. The note and date are saved permanently.</li>
+  <li>The <b>Dashboard</b> shows a reminder when something is due or overdue.</li>
+</ul>
+<div class="example"><b class="l">Example</b>It is the first Monday of the month. You open Government data, see "Tariff codes and programs: due". You read the latest tariff notices, find nothing that affects your products, click <b>I checked this</b> and write "Reviewed October notices, no change to our HTS codes". The reminder clears and the note is kept for auditors.</div>
+
+<h2 id="audit">Audit log <small>(Records menu)</small></h2>
+<div class="purpose"><b>Purpose</b>The permanent, tamper-evident record of everything done in the app. This is what you show an auditor or customer to prove the process is real.</div>
+<div class="example"><b class="l">Example (made-up names)</b>A customer's auditor asks: "Who approved the classification for XYZ-2, and when?" You filter Audit to that item and see the person, the date and what changed. Entries cannot be edited or deleted, and each is linked to the one before it, so any tampering would show.</div>
+<ul>
+  <li>Each entry shows number, time, who, whether something was created, changed or deleted, which record, and what changed. <span class="btn">Details</span> shows before and after values.</li>
+  <li>Filter by date, area (such as Screening hit or Classification), action, or free text.</li>
+  <li>The badge at the top (<span class="b g">Integrity verified</span>) means the chain of entries checks out. <span class="b r">Integrity problem</span> means an entry was altered or removed, so tell your admin immediately.</li>
+  <li><span class="btn">Export CSV</span> for the full set; <span class="btn">Print / save as PDF report</span> for a formatted report. The screen shows the latest 500 entries.</li>
+  <li>Entries cannot be edited or deleted by anyone through the app.</li>
+</ul>
+
+<div class="part"><b>Part 2 · Restricted party screening</b>On when the Restricted party screening feature is on (Configuration &gt; Features). It also applies to conflict minerals suppliers if you want them screened.</div>
+
 <h2 id="screening">Screening <small>(supplier and customer pages &gt; Screening tab; restricted party screening)</small></h2>
 <div class="purpose"><b>Purpose</b>Checks the names of our suppliers and customers against government lists of sanctioned or restricted parties. Doing business with a listed party can lead to serious penalties, so we check regularly and keep proof that we did.</div>
 <div class="example"><b class="l">Example (made-up names)</b>You add a new customer, Meridian Trading Co. Screening finds a possible match with a listed company that has a similar name. Nothing is accused. You compare the country, address and what each company does, decide "not the same company" and write why. Six months later an auditor asks and you can show exactly what you looked at and when.</div>
@@ -344,7 +360,17 @@
 <p>A written reason is required for both. Example: <i>"Different country and address; the listed party is an individual and ours is a company."</i></p>
 <div class="warn"><b>If you confirm a match:</b> stop shipments and payments involving that party, and escalate to counsel. The app records the decision; it does not handle the legal response.</div>
 
-<!-- ============ TRADE ============ -->
+<div class="part"><b>Part 3 · Trade compliance (export and import)</b>On when the Trade compliance (EAR / ITAR) feature is on. Products (SKUs), Orders, Classifications, Customers, Rules and Customs records all belong here. Turn the feature off and none of this appears in the app.</div>
+
+<h2 id="skus">Products (SKUs) <small>(Configuration menu, Trade compliance section)</small></h2>
+<div class="purpose"><b>Purpose</b>Our product catalogue. A product (SKU, stock keeping unit) is one sellable part number. This page is part of Trade compliance and is hidden when that feature is off. Linking each product (SKU) to its supplier lets us answer a customer's question "is part X conflict-minerals compliant?" by looking up the supplier's current form.</div>
+<div class="example"><b class="l">Example (made-up names)</b>A customer asks: "Is part XYZ-2 conflict-minerals compliant?" You search XYZ-2, see it is made by Brightline Electronics, and open Brightline's current declaration. Without the part-to-supplier link you would be digging through old emails.</div>
+<ul>
+  <li>Search by product (SKU), description or supplier.</li>
+  <li><span class="btn">+ Add product (SKU)</span> adds one part.</li>
+  <li><span class="btn">Import CSV</span> adds many. Columns: <code>sku</code> and <code>supplier</code> (required, supplier name must match exactly), plus optional <code>description</code> and <code>supplier part number</code>. Existing SKUs are updated, not duplicated. Rows with an unrecognized supplier are skipped and listed.</li>
+</ul>
+
 <h2 id="trade">Orders, classification and trade rules <small>(Orders, Records and Configuration menus)</small></h2>
 <p>When you open an order, the top of the order file shows a <b>progress strip</b> (Screened, Checklist complete, Cleared, Shipped) and a <b>Next step</b> banner. The banner names the first thing holding the order, such as a missing license decision, and gives the button to do it. Orders that are cleared say Ready to ship; blocked orders say so.</p>
 <div class="purpose"><b>Purpose</b>Export and import compliance. Before a product leaves the country we need to know how it is controlled; before an order ships we need to know who receives it and where. For imports we need the tariff code and country of origin so duties are right.</div>
@@ -462,53 +488,32 @@ MLN-1234,EAR,7A994,9031.80.8085,US,supplier_stated,Per supplier classification l
 </table>
 <p>Items the app checks itself, always as Hold: an approved classification for every item and clear screening results.</p>
 
-<!-- ============ REVIEW ============ -->
-<h2 id="review">Documents <small>(supplier page &gt; Documents &amp; requests)</small></h2>
-<div class="purpose"><b>Purpose</b>The inbox for everything suppliers send us. Nothing a supplier uploads counts until a person accepts it.</div>
-<div class="example"><b class="l">Example (made-up names)</b>Brightline uploads a conflict minerals form. It sits in Review until you open it, check it is the right file and year, and press Accept. Until then it does not count. That stops a wrong file, or a form from last year, from quietly passing as this year's declaration.</div>
-<h3>Documents to review</h3>
-<p>Each uploaded document shows the supplier, type, upload date and a SHA-256 "fingerprint" that proves the file has not changed since upload. For conflict minerals forms it also shows how many smelters need attention. Buttons: <span class="btn">View</span>, <span class="btn">Open file</span>, and then one decision:</p>
+<h2 id="example">Worked example: one order from start to finish</h2>
+<div class="purpose"><b>Purpose</b>Shows how the pieces fit together by following one pretend order. All names are made up. Do the same steps with your own data and the rest of this guide will make sense.</div>
+<p>We sell a sensor, <b>XYZ-2</b>, made by our supplier <b>Brightline Electronics</b>. A new Canadian customer, <b>Prairie Harvest Equipment</b>, orders two units. Order number <b>SO-1042</b>.</p>
 <table>
-  <tr><th style="width:26%">Decision</th><th>Use when</th></tr>
-  <tr><td><span class="b g">Accept</span></td><td>The document is complete and usable.</td></tr>
-  <tr><td><span class="b a">Accept with gaps</span></td><td>Usable but incomplete. A note records what is missing.</td></tr>
-  <tr><td><span class="b r">Reject</span></td><td>Unusable. The supplier will need to send another.</td></tr>
+  <tr><th style="width:5%">#</th><th style="width:30%">What you do</th><th>Where</th><th style="width:30%">Why it matters</th></tr>
+  <tr><td>1</td><td>Add Prairie Harvest as a customer, with a contact person.</td><td>Configuration &gt; Customers</td><td>Only parties that exist in the app can be screened and put on orders.</td></tr>
+  <tr><td>2</td><td>Press <span class="btn">EUS</span>, then <i>Send signing link</i>. The contact signs on a web page.</td><td>Configuration &gt; Customers</td><td>The signed end user statement is the customer's promise about who will use the products and where. Many export rules expect it.</td></tr>
+  <tr><td>3</td><td>Screen Prairie Harvest against the government lists. No match, so nothing more to do.</td><td>Screening</td><td>Proves you checked before selling, and which list version you used.</td></tr>
+  <tr><td>4</td><td>Classify XYZ-2: jurisdiction EAR, ECCN <i>EAR99</i>, source <i>Supplier stated</i>, short rationale, then approve.</td><td>Configuration &gt; Classifications</td><td>The classification says how strictly the product is controlled. It is recorded once and reused for every order.</td></tr>
+  <tr><td>5</td><td>Create order SO-1042: customer, destination CA, item XYZ-2 x 2. Press <span class="btn">Screen order</span>.</td><td>Orders</td><td>The app checks the parties, destination and items together.</td></tr>
+  <tr><td>6</td><td>The order is <span class="b a">On hold</span>: <i>License determination not recorded</i>. Open it, press <i>Record</i>, choose <i>No license required (NLR)</i>, and write why (for example "All items EAR99, customer signed EUS"). The order moves to <span class="b g">Cleared</span>, with a note that the purchase order is still missing.</td><td>Order file</td><td>A person, not the app, decides whether a licence is needed. The app only makes sure that decision exists before shipping.</td></tr>
+  <tr><td>7</td><td>Attach the customer's purchase order. The note disappears and the order file shows this item as done.</td><td>Order file &gt; Attach document</td><td>Documents on the order become part of the evidence file.</td></tr>
+  <tr><td>8</td><td>Ship. Enter the ship date and attach the invoice and shipping documents.</td><td>Order file</td><td>The ship date starts the record-keeping clock (five years in this version, to be confirmed with counsel).</td></tr>
+  <tr><td>9</td><td>Years later, an auditor asks about SO-1042. Open the order and press <span class="btn">Download order file</span>.</td><td>Order file</td><td>One zip file holds the screening record, the classification as it was then, the signed statement and every document.</td></tr>
 </table>
-<h3>Ownership forms <small>(supplier page &gt; Screening)</small></h3>
-<p>Suppliers can certify who owns them. Ownership matters because sanctions rules (for example OFAC's "50 percent rule") can apply to a company owned by listed parties even when the company itself is not listed. Review the named owners, then <span class="btn">Accept &amp; screen owners</span> (the owners are added and screened) or <span class="btn">Send back</span>.</p>
+<div class="example"><b class="l">What if something goes wrong?</b>At step 3, suppose the screening finds a <b>possible match</b>: a listed company with a similar name. That does <b>not</b> mean your customer is on a list. Names are matched loosely on purpose so nothing slips through, and most matches are different companies. Open the match, compare the country, address and other details, decide "same party" or "not the same party", and write what you looked at. If you are unsure, do not guess: leave it unresolved and ask your compliance lead. Orders for that customer stay on hold until the match is decided.</div>
 
-<!-- ============ AUDIT ============ -->
-<h2 id="govdata">Government data <small>(Configuration menu)</small></h2>
-<p>One page for the outside information the app depends on: the restricted party list, the smelter list, tariff codes, export control rules, your destination country list, the end user statement wording and the form version. The table shows when each was last updated, when it is next due, and whether it is current.</p>
-<ul>
-  <li><b>Lists that come from a file</b> (screening list, smelter list): download the file, then use the <b>Load list</b> button on that list's row in the table and pick it. This is the only place lists are loaded; the Dashboard and the supplier pages only show when each list was last loaded.</li>
-  <li><b>Things a person reviews</b> (tariff codes, export control rules, country list, statement wording, form version): click <b>I checked this</b> and write what you checked. The note and date are saved permanently.</li>
-  <li>The <b>Dashboard</b> shows a reminder when something is due or overdue.</li>
-</ul>
-<div class="example"><b class="l">Example</b>It is the first Monday of the month. You open Government data, see "Tariff codes and programs: due". You read the latest tariff notices, find nothing that affects your products, click <b>I checked this</b> and write "Reviewed October notices, no change to our HTS codes". The reminder clears and the note is kept for auditors.</div>
-
-<h2 id="audit">Audit log <small>(Records menu)</small></h2>
-<div class="purpose"><b>Purpose</b>The permanent, tamper-evident record of everything done in the app. This is what you show an auditor or customer to prove the process is real.</div>
-<div class="example"><b class="l">Example (made-up names)</b>A customer's auditor asks: "Who approved the classification for XYZ-2, and when?" You filter Audit to that item and see the person, the date and what changed. Entries cannot be edited or deleted, and each is linked to the one before it, so any tampering would show.</div>
-<ul>
-  <li>Each entry shows number, time, who, whether something was created, changed or deleted, which record, and what changed. <span class="btn">Details</span> shows before and after values.</li>
-  <li>Filter by date, area (such as Screening hit or Classification), action, or free text.</li>
-  <li>The badge at the top (<span class="b g">Integrity verified</span>) means the chain of entries checks out. <span class="b r">Integrity problem</span> means an entry was altered or removed, so tell your admin immediately.</li>
-  <li><span class="btn">Export CSV</span> for the full set; <span class="btn">Print / save as PDF report</span> for a formatted report. The screen shows the latest 500 entries.</li>
-  <li>Entries cannot be edited or deleted by anyone through the app.</li>
-</ul>
-
-<!-- ============ PORTAL ============ -->
-<h2 id="portal">The supplier portal (what suppliers see)</h2>
-<div class="purpose"><b>Purpose</b>A simple page where suppliers upload what we asked for, without needing an account or password.</div>
-<ul>
-  <li>The supplier opens the private link you sent, sees what is requested, and uploads the file. Some requests also ask them to certify ownership.</li>
-  <li>Links expire. Each is tied to one supplier and one request. If a link expires or is lost, use <span class="btn">Remind</span> on Requests to make a fresh one.</li>
-  <li>Uploads appear in <b>Review</b>. Suppliers see only their own request, never other data in the app.</li>
-</ul>
-
-<h3>Customers signing an end user statement</h3>
-<p>Customers get a different private link, which opens the end user statement page instead of an upload page. They read it, fill in the end user and end use, sign, and see a confirmation they can print. Nothing else in the app is visible to them.</p>
+<h3>Questions beginners often ask</h3>
+<table>
+  <tr><th style="width:34%">Question</th><th>Answer</th></tr>
+  <tr><td>Do I need to know what an ECCN or EAR99 is?</td><td>No. You record what your supplier, compliance lead or counsel tells you. The app stores who decided, what they decided and why. The glossary at the end explains the terms if you are curious.</td></tr>
+  <tr><td>A screening match came up. Is the customer on a list?</td><td>Probably not. Names are matched loosely, so most possible matches are different companies. You compare the details, decide, and write down why.</td></tr>
+  <tr><td>I made a mistake. Can I delete it?</td><td>Usually not, on purpose. Evidence cannot be changed or removed. Correct it by adding a new version or a note, and deactivate things instead of deleting them. The history of the correction is part of the record.</td></tr>
+  <tr><td>What if I am not sure?</td><td>Leave it on hold and ask your compliance lead or counsel. The app is built so that "hold and ask" is cheap and shipping by mistake is hard.</td></tr>
+  <tr><td>What does the app not do?</td><td>It does not decide whether a licence is needed, whether a product meets the Trade Agreements Act, or whether a purchase order is a standard FAR Part 12 order. It makes sure a person has decided, and keeps the evidence.</td></tr>
+</table>
 
 <!-- ============ ROUTINES ============ -->
 <h2 id="routines">Suggested routines</h2>
@@ -573,6 +578,7 @@ MLN-1234,EAR,7A994,9031.80.8085,US,supplier_stated,Per supplier classification l
 <h2 id="versions">Version history</h2>
 <table>
   <tr><th style="width:14%">Version</th><th style="width:16%">Date</th><th>Change</th></tr>
+  <tr><td>1.12.2</td><td>9 Nov 2026</td><td>Applies to app 1.12.1 (guide-only change). The guide is reorganised the way the app is: Part 1 everyday work and conflict minerals (always on: Dashboard, Suppliers, Document requests, CMRT check, Documents, Supplier portal, Government data, Audit log), Part 2 restricted party screening, Part 3 trade compliance (Products, Orders and trade rules, worked example).</td></tr>
   <tr><td>1.12.1</td><td>9 Nov 2026</td><td>Applies to app 1.12.1. Change password is now in the account menu (person icon, top right) for signed-in users.</td></tr>
   <tr><td>1.12.0</td><td>9 Nov 2026</td><td>Applies to app 1.12.0. New "Forgot your password?" on the sign-in screen: a one-time code is emailed and typed into the app, then a new password is set. No link is involved. Requires a small change to the Supabase "Reset Password" email template (see SETUP.md).</td></tr>
   <tr><td>1.11.5</td><td>29 Oct 2026</td><td>Applies to app 1.11.5. A deactivated supplier or customer no longer shows on the Dashboard (CMRT check tile and To do list) or on the CMRT check page. Database part 14 changed (re-run it).</td></tr>
@@ -608,7 +614,7 @@ MLN-1234,EAR,7A994,9031.80.8085,US,supplier_stated,Per supplier classification l
   <tr><td>1.1.0</td><td>22 Oct 2026</td><td>Adds end user statements (online signing or upload), the order file (checklist, licence determination, government-contract flags, download), shipment-check levels and the Rules tab (renamed from Destinations), new document types, and database part 10. Documents the starting assumptions.</td></tr>
   <tr><td>1.0.0</td><td>16 Oct 2026</td><td>First versioned release. Covers the app through the trade compliance and screening speed updates (database parts 1–9). The app, portal and this guide are versioned separately; each increases with every revision.</td></tr>
 </table>
-<p style="color:var(--muted);font-size:.9rem;margin-top:24px">Conformality user guide v1.12.1</p>
+<p style="color:var(--muted);font-size:.9rem;margin-top:24px">Conformality user guide v1.12.2</p>
 </main>
 </div>
 </body>
