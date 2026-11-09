@@ -45,6 +45,7 @@ main div:has(>table){overflow-x:auto}
 // ---- VERSION: increase with every revision (also update the user guide's "applies to") ----
 // 1.11.0 Records shows just "Audit log" when trade compliance is off. Suppliers: Import and Export (CSV) and exception filters. Every page opens with a line saying what is expected.
 //        Every dialog has an X in its corner. Government data: the "Where to update each one" section is gone; Load list is a button on the table row.
+// 1.12.1 Account menu: Change password (current password checked first, then updateUser).
 // 1.12.0 Forgot password: sign-in screen has a reset by one-time code (resetPasswordForEmail, then verifyOtp, then updateUser) so filtered links are not needed. Supabase email template must contain {{ .Token }}.
 // 1.11.5 Deactivated suppliers no longer appear in the Dashboard CMRT tile, the CMRT check page or the Dashboard to-do list (database part 14 updated).
 // 1.11.4 Dashboard on a phone: each item wraps (pill and text on top, action button on its own line) so nothing scrolls sideways.
@@ -89,7 +90,7 @@ main div:has(>table){overflow-x:auto}
 //        government-contract flags (FAR Part 12 / TAA / BAA), shipment-check levels (Trade > Rules), order file download.
 //        Fixed: date-only values no longer show a day early in US time zones.
 // 1.0.0  First versioned release. Added the user guide link.
-const APP_VERSION = '1.12.0';
+const APP_VERSION = '1.12.1';
 // ---- CONFIG: paste your Supabase project values -------------------------------
 const CFG = {
   url: 'https://sjwarllnehssyphoormc.supabase.co',                    // https://xxxx.supabase.co
@@ -2139,7 +2140,7 @@ const actions = {
   dashAll: () => { dashFilter = null; dashArea = null; renderToday(); },
   dashArea: ({ k }) => { dashArea = dashArea === k ? null : k; renderToday(); },
   bell: () => { popMenu('bell', '#bellBtn', bellHtml(), 380); refreshBell(true); },
-  userMenu: () => popMenu('user', '#userBtn', `<div class="px-4 py-3 border-b border-slate-200"><div class="font-semibold">${esc(profile?.full_name || user?.email || '')}</div><div class="text-xs text-slate-500 break-all">${esc(user?.email || '')}</div><div class="text-xs text-slate-500">Role: ${esc(profile?.role || '')}</div></div><button data-a="signout" class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm hover:bg-slate-50">${ico('logout')}Sign out</button>`, 260),
+  userMenu: () => popMenu('user', '#userBtn', `<div class="px-4 py-3 border-b border-slate-200"><div class="font-semibold">${esc(profile?.full_name || user?.email || '')}</div><div class="text-xs text-slate-500 break-all">${esc(user?.email || '')}</div><div class="text-xs text-slate-500">Role: ${esc(profile?.role || '')}</div></div><button data-a="chgPw" class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm hover:bg-slate-50">${ico('user')}Change password</button><button data-a="signout" class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm hover:bg-slate-50">${ico('logout')}Sign out</button>`, 260),
   bellGo: (d) => {
     closeNavMenu();
     if (d.rt === 'transactions') return actions.goTrade({ t: 'orders', id: d.id });
@@ -2180,6 +2181,26 @@ const actions = {
     document.body.appendChild(m);
   },
   signout: async () => { await sb.auth.signOut(); },
+  chgPw: () => {
+    closeNavMenu();
+    modal(`<h3 class="text-lg font-semibold">Change password</h3><p class="text-sm text-slate-500 mt-1">Signed in as ${esc(user?.email || '')}.</p>
+      <label class="block mt-3 text-sm">Current password<input id="pwOld" type="password" autocomplete="current-password" class="${inp}"></label>
+      <label class="block mt-3 text-sm">New password<input id="pwNew" type="password" autocomplete="new-password" class="${inp}"></label>
+      <label class="block mt-3 text-sm">Repeat new password<input id="pwNew2" type="password" autocomplete="new-password" class="${inp}"></label>
+      <p id="fErr" class="text-xs text-red-600 mt-2 min-h-4"></p>
+      <div class="mt-3 flex justify-end gap-2">${btn('Cancel', 'close', {}, 'ghost')}${btn('Save password', 'pwSave')}</div>`);
+  },
+  pwSave: async () => {
+    const err = (m) => ($('#fErr').textContent = m), o = $('#pwOld').value, a = $('#pwNew').value;
+    if (!o || !a) return err('Fill in all three boxes.');
+    if (a !== $('#pwNew2').value) return err('The two new passwords do not match.');
+    if (a === o) return err('The new password is the same as the current one.');
+    const chk = await sb.auth.signInWithPassword({ email: user.email, password: o });
+    if (chk.error) return err('The current password is not right.');
+    const { error } = await sb.auth.updateUser({ password: a });
+    if (error) return err(error.message);
+    closeModal(); toast('Password changed');
+  },
   mOk: () => askNote.ok(), mCancel: () => askNote.cancel(),
   modalX: () => { if (askNote.open) askNote.cancel(); else closeModal(); },
   close: () => closeModal(),
