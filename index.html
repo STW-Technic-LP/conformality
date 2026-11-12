@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="version" content="1.5.1">
+<meta name="version" content="1.14.0">
 <title>Conformality</title>
 <link rel="icon" href="./favicon.svg" type="image/svg+xml">
 <link rel="icon" href="./favicon.ico" sizes="48x48">
@@ -43,6 +43,8 @@ main div:has(>table){overflow-x:auto}
 
 <script>
 // ---- VERSION: increase with every revision (also update the user guide's "applies to") ----
+// 1.14.0 Audit log: paging (25/50/100/200 per page, first/previous/next/last, jump to a page), oldest/newest first, quick date ranges, search that covers the whole log (user, record name, any value; #123 for one entry), "All entries for this record" in the entry details. Search of record contents needs database part 15 (v_audit_search); without it, search covers users only.
+// 1.13.0 New Settings area (account menu > Settings): Account, Organization, Features (moved from Configuration), Users (admin: change roles, activate or deactivate), and reminder/threshold numbers for conflict minerals, screening and trade compliance.
 // 1.11.0 Records shows just "Audit log" when trade compliance is off. Suppliers: Import and Export (CSV) and exception filters. Every page opens with a line saying what is expected.
 //        Every dialog has an X in its corner. Government data: the "Where to update each one" section is gone; Load list is a button on the table row.
 // 1.12.1 Account menu: Change password (current password checked first, then updateUser).
@@ -90,7 +92,7 @@ main div:has(>table){overflow-x:auto}
 //        government-contract flags (FAR Part 12 / TAA / BAA), shipment-check levels (Trade > Rules), order file download.
 //        Fixed: date-only values no longer show a day early in US time zones.
 // 1.0.0  First versioned release. Added the user guide link.
-const APP_VERSION = '1.12.1';
+const APP_VERSION = '1.14.0';
 // ---- CONFIG: paste your Supabase project values -------------------------------
 const CFG = {
   url: 'https://sjwarllnehssyphoormc.supabase.co',                    // https://xxxx.supabase.co
@@ -179,13 +181,13 @@ function askNote(title, required) {
 
 // ---- shell -------------------------------------------------------------------
 // Conflict minerals topics come first in every menu; trade compliance (EAR/ITAR) topics follow under a heading.
-// Feature flags (Configuration > Features) remove the trade or screening items; see buildNav().
+// Feature flags (Settings > Features) remove the trade or screening items; see buildNav().
 let FEAT = { trade: true, screening: true };
 const SEP = ['--', 'Trade compliance'];
 const NAV_ALL = [
   { id: 'today', label: 'Dashboard', icon: 'dashboard', v: 'today' },
   { id: 'orders', label: 'Orders', icon: 'package', v: 'trade', t: 'orders', trade: true },
-  { label: 'Configuration', icon: 'sliders', items: [['suppliers', 'Suppliers', 'building'], ['govdata', 'Government data', 'landmark'], ['features', 'Features', 'sliders'], SEP, ['skus', 'Products (SKUs)', 'tag'], ['trade', 'Classifications', 'filecheck', 'class'], ['trade', 'Customers', 'users', 'parties'], ['trade', 'Rules', 'sliders', 'dest']] },
+  { label: 'Configuration', icon: 'sliders', items: [['suppliers', 'Suppliers', 'building'], ['govdata', 'Government data', 'landmark'], SEP, ['skus', 'Products (SKUs)', 'tag'], ['trade', 'Classifications', 'filecheck', 'class'], ['trade', 'Customers', 'users', 'parties'], ['trade', 'Rules', 'sliders', 'dest']] },
   { label: 'Records', icon: 'scroll', items: [['audit', 'Audit log', 'scroll'], SEP, ['trade', 'Customs records', 'filetext', 'records']] }
 ];
 const OLD_VIEWS = ['review', 'requests', 'minerals', 'ownership', 'screening'];   // pages that were folded into the supplier/customer pages and the Dashboard (1.10.0)
@@ -410,19 +412,74 @@ const FEATURES = [
   { key: 'feature_trade_compliance', id: 'trade', name: 'Trade compliance (EAR / ITAR)', hides: 'Orders, Products (SKUs) (including the Products tab and product count on supplier pages), Classifications, Customers and their end user statements, Rules (destination countries and check levels), Customs records, and the tariff and export-control rows under Government data.', keeps: 'Suppliers, document requests, CMRT checks and the smelter list (conflict minerals), and the Audit log.' },
   { key: 'feature_party_screening', id: 'screening', name: 'Restricted party screening and ownership reviews', hides: 'Screening matches, Ownership forms, the screening list under Government data, and the screening tile on supplier pages.', keeps: 'Everything else. This must stay on while trade compliance is on, because orders are screened.' }
 ];
-async function renderFeatures() {
+// ---- Settings (account menu): Account, Organization, Features, Users and the numbers behind reminders ------------
+let setTab = 'account';
+// [key, label, help, min, max, step]; saved to app_settings (admin only)
+const SET_GROUPS = {
+  minerals: { label: 'Conflict minerals', icon: 'building', intro: 'How far ahead people are reminded about supplier requests and documents.', fields: [
+    ['request_reminder_days', 'Request reminder (days)', 'A document request appears on the To do list this many days before it is due.', 1, 90, 1],
+    ['doc_expiry_warning_days', 'Document expiry warning (days)', 'Warn this many days before a supplier document expires.', 1, 365, 1],
+    ['portal_link_days', 'Supplier link validity (days)', 'How long a new supplier link or code stays valid.', 1, 365, 1]] },
+  screening: { label: 'Screening', icon: 'search', intro: 'How often parties are screened and how sensitive the name matching is. Change these with your compliance lead.', fields: [
+    ['rescreen_days', 'Re-screen every (days)', 'Every active supplier and customer is screened again at least this often.', 1, 365, 1],
+    ['lists_stale_days', 'Screening list out of date after (days)', 'Warn if no screening list has been loaded within this many days.', 1, 60, 1],
+    ['screen_review_threshold', 'Possible match score (0 to 1)', 'Name matches at or above this score are raised for review. Lower finds more matches to review; higher finds fewer.', 0.05, 1, 0.01],
+    ['screen_likely_threshold', 'Likely match score (0 to 1)', 'Matches at or above this score are labelled likely. It cannot be lower than the possible match score.', 0.05, 1, 0.01],
+    ['ownership_min_percent', 'Ownership reporting threshold (%)', 'Suppliers are asked to list owners at or above this percentage. Confirm the number with counsel.', 1, 100, 1]] },
+  trade: { label: 'Trade compliance', icon: 'filecheck', intro: 'Reminders and record keeping for orders, classifications and customs records.', fields: [
+    ['eus_warn_days', 'End user statement expiry warning (days)', 'Warn on the Dashboard when a customer\'s end user statement expires within this many days.', 1, 365, 1],
+    ['classification_review_months', 'Classification review (months)', 'Default months until an approved classification is reviewed again.', 1, 60, 1],
+    ['customs_retention_years', 'Keep customs records (years)', 'New customs records get a keep-until date this many years after their date. The app shows the date; it does not delete anything. Confirm the period with counsel.', 1, 30, 1]] }
+};
+const ROLE_TEXT = { admin: 'Everything, including Settings, Users, rules, and ITAR approvals.', editor: 'Does the daily work: requests, reviews, screening, classification and orders. Cannot change Settings or users.', viewer: 'Read only, for example leadership or auditors.' };
+async function renderSettings() {
   loading(); await loadFeatures();
-  const admin = profile?.role === 'admin';
-  const row = (f) => {
-    const on = FEAT[f.id], locked = f.id === 'screening' && FEAT.trade;
-    return `<div class="rounded-xl bg-white border border-slate-200 p-4 flex flex-wrap items-start gap-3"><div class="flex-1 min-w-[16rem]"><div class="flex items-center gap-2"><span class="font-medium">${f.name}</span>${badge(on ? 'On' : 'Off', on ? 'green' : 'gray')}</div>
-      <p class="text-sm text-slate-600 mt-1"><b>When off, hidden:</b> ${f.hides}</p><p class="text-sm text-slate-600 mt-1"><b>Always available:</b> ${f.keeps}</p>
-      ${locked ? '<p class="text-xs text-slate-500 mt-1">Turn trade compliance off first if you want to turn this off.</p>' : ''}</div>
-      <div class="shrink-0">${admin && !locked ? btn(on ? 'Turn off' : 'Turn on', 'featureAsk', { k: f.key, on: on ? '0' : '1' }, on ? 'danger' : 'primary') : ''}</div></div>`;
-  };
-  shell(`<h2 class="text-xl font-semibold mb-1">Features</h2>
-    <p class="text-sm text-slate-500 mb-4">Conflict minerals compliance is always on. Turn on only the compliance areas your company needs. Turning something off hides it and stops new records being created; nothing is deleted, and turning it back on restores everything. Every change is recorded in the Audit log.${admin ? '' : ' Only an admin can change these settings.'}</p>
-    <div class="grid gap-3 max-w-4xl"><div class="rounded-xl bg-white border border-slate-200 p-4"><div class="flex items-center gap-2"><span class="font-medium">Conflict minerals (suppliers, requests, CMRT, smelters)</span>${badge('Always on', 'green')}</div></div>${FEATURES.map(row).join('')}</div>`);
+  const admin = isAdminUser();
+  const tabs = [['account', 'Account', 'user'], ['org', 'Organization', 'landmark'], ['features', 'Features', 'sliders'], ['users', 'Users', 'users'], ['minerals', 'Conflict minerals', 'building'], ['screening', 'Screening', 'search'], ['trade', 'Trade compliance', 'filecheck']]
+    .filter(([k]) => (k !== 'users' || admin) && (k !== 'screening' || FEAT.screening) && (k !== 'trade' || FEAT.trade));
+  if (!tabs.some(([k]) => k === setTab)) setTab = 'account';
+  const card = (t, inner) => `<div class="rounded-xl bg-white border border-slate-200 max-w-4xl"><div class="px-4 py-3 border-b border-slate-200 font-semibold">${t}</div>${inner}</div>`;
+  const ro = admin ? '' : '<p class="text-xs text-slate-500 mt-3">Only an admin can change these settings.</p>';
+  let intro = '', body = '';
+  if (setTab === 'account') {
+    intro = 'Your own sign-in details.';
+    body = card('Your account', `<div class="p-4 text-sm grid gap-2"><div><span class="text-slate-500">Name</span> <b>${esc(profile?.full_name || '')}</b></div><div><span class="text-slate-500">Email</span> <b>${esc(user?.email || '')}</b></div><div><span class="text-slate-500">Role</span> ${badge(profile?.role || '', 'gray')} <span class="text-slate-600">${esc(ROLE_TEXT[profile?.role] || '')}</span></div><div class="mt-2">${btn('Change password', 'chgPw', {}, 'ghost')}</div></div>`)
+      + `<div class="mt-4 max-w-4xl rounded-xl bg-white border border-slate-200 overflow-x-auto"><table class="w-full text-sm"><thead class="text-left text-slate-500 border-b border-slate-200"><tr><th class="p-3">Role</th><th class="p-3">What it can do</th></tr></thead><tbody class="divide-y divide-slate-100">${Object.keys(ROLE_TEXT).map((r) => `<tr><td class="p-3 font-medium">${r}</td><td class="p-3">${esc(ROLE_TEXT[r])}</td></tr>`).join('')}</tbody></table></div>`;
+  } else if (setTab === 'org') {
+    intro = 'Details about your company that appear on supplier pages and customer reports.';
+    const r = await sb.from('app_settings').select('value').eq('key', 'company_name').maybeSingle();
+    const name = r.data && r.data.value != null ? String(r.data.value) : '';
+    body = card('Company', `<div class="p-4"><label class="block text-sm">Company name<input id="stCompany" value="${esc(name)}" ${admin ? '' : 'disabled'} maxlength="120" class="${inp} max-w-md"></label><p class="text-xs text-slate-500 mt-1">Shown on the supplier portal pages and on customer reports.</p><p id="stErr" class="text-xs text-red-600 mt-2 min-h-4"></p>${admin ? `<div>${btn('Save', 'saveCompany')}</div>` : ro}</div>`);
+  } else if (setTab === 'features') {
+    intro = 'Conflict minerals compliance is always on. Turn on only the compliance areas your company needs. Turning something off hides it and stops new records being created; nothing is deleted, and turning it back on restores everything. Every change is recorded in the Audit log.' + (admin ? '' : ' Only an admin can change these settings.');
+    const row = (f) => {
+      const on = FEAT[f.id], locked = f.id === 'screening' && FEAT.trade;
+      return `<div class="rounded-xl bg-white border border-slate-200 p-4 flex flex-wrap items-start gap-3"><div class="flex-1 min-w-[16rem]"><div class="flex items-center gap-2"><span class="font-medium">${f.name}</span>${badge(on ? 'On' : 'Off', on ? 'green' : 'gray')}</div>
+        <p class="text-sm text-slate-600 mt-1"><b>When off, hidden:</b> ${f.hides}</p><p class="text-sm text-slate-600 mt-1"><b>Always available:</b> ${f.keeps}</p>
+        ${locked ? '<p class="text-xs text-slate-500 mt-1">Turn trade compliance off first if you want to turn this off.</p>' : ''}</div>
+        <div class="shrink-0">${admin && !locked ? btn(on ? 'Turn off' : 'Turn on', 'featureAsk', { k: f.key, on: on ? '0' : '1' }, on ? 'danger' : 'primary') : ''}</div></div>`;
+    };
+    body = `<div class="grid gap-3 max-w-4xl"><div class="rounded-xl bg-white border border-slate-200 p-4"><div class="flex items-center gap-2"><span class="font-medium">Conflict minerals (suppliers, requests, CMRT, smelters)</span>${badge('Always on', 'green')}</div></div>${FEATURES.map(row).join('')}</div>`;
+  } else if (setTab === 'users') {
+    intro = 'Who can sign in and what they can do. People can only be added in Supabase; once they exist they appear here.';
+    const r = await sb.from('profiles').select('id,email,full_name,role,active,created_at').order('active', { ascending: false }).order('role').order('email');
+    if (r.error) return fail(r.error);
+    const rows = r.data || [], waiting = rows.filter((x) => !x.active).length;
+    const rolesel = (x, me) => `<select id="ur_${esc(x.id)}" data-urole="${esc(x.id)}" ${me || !x.active ? 'disabled' : ''} class="rounded-lg border border-slate-300 p-1.5 text-sm">${['admin', 'editor', 'viewer'].map((o) => `<option value="${o}" ${x.role === o ? 'selected' : ''}>${o}</option>`).join('')}</select>`;
+    const rolesel2 = (x) => `<select id="ur_${esc(x.id)}" class="rounded-lg border border-slate-300 p-1.5 text-sm">${['admin', 'editor', 'viewer'].map((o) => `<option value="${o}" ${x.role === o ? 'selected' : ''}>${o}</option>`).join('')}</select>`;
+    body = `${waiting ? `<div class="mb-3 max-w-4xl rounded-xl bg-amber-50 border border-amber-200 p-3 text-sm text-amber-900">${waiting} ${waiting === 1 ? 'person has' : 'people have'} a login but no access. Pick a role and press <b>Activate</b> to let them in.</div>` : ''}
+      <div class="rounded-xl bg-white border border-slate-200 overflow-x-auto max-w-4xl"><table class="w-full text-sm"><thead class="text-left text-slate-500 border-b border-slate-200"><tr><th class="p-3">Name</th><th class="p-3">Email</th><th class="p-3">Role</th><th class="p-3">Status</th><th class="p-3"></th></tr></thead>
+      <tbody class="divide-y divide-slate-100">${rows.map((x) => { const me = x.id === user?.id; return `<tr><td class="p-3 font-medium">${esc(x.full_name || '')}${me ? ' <span class="text-xs text-slate-500">(you)</span>' : ''}</td><td class="p-3 break-all">${esc(x.email || '')}</td><td class="p-3">${x.active ? rolesel(x, me) : rolesel2(x)}</td><td class="p-3">${badge(x.active ? 'Active' : 'No access', x.active ? 'green' : 'amber')}</td><td class="p-3 text-right">${me ? '' : x.active ? btn('Deactivate', 'userOffAsk', { id: x.id, name: x.full_name || x.email }, 'ghost') : btn('Activate', 'userOn', { id: x.id })}</td></tr>`; }).join('') || '<tr><td colspan="5" class="p-6 text-center text-slate-500">No users yet.</td></tr>'}</tbody></table></div>
+      <div class="mt-4 max-w-4xl rounded-xl bg-white border border-slate-200 p-4 text-sm text-slate-600"><b class="text-slate-800">To add someone</b><ol class="list-decimal ml-5 mt-1 grid gap-0.5"><li>In Supabase open Authentication &rsaquo; Users &rsaquo; Add user, and create their login (or have them sign in once if you use single sign-on).</li><li>They appear in this list with "No access".</li><li>Pick their role and press <b>Activate</b>.</li></ol><p class="mt-2">Deactivating keeps a person's history and removes all access. There must always be at least one active admin.</p></div>`;
+  } else {
+    const g = SET_GROUPS[setTab];
+    intro = g.intro;
+    const vr = await sb.from('app_settings').select('key,value').in('key', g.fields.map((f) => f[0]));
+    const val = (k) => { const x = (vr.data || []).find((y) => y.key === k); return x ? Number(x.value) : ''; };
+    body = card(g.label, `<div class="p-4 grid gap-4">${g.fields.map(([k, l, h, mn, mx, st]) => `<label class="block text-sm"><span class="font-medium">${esc(l)}</span><input id="st_${k}" type="number" min="${mn}" max="${mx}" step="${st}" value="${esc(val(k))}" ${admin ? '' : 'disabled'} class="${inp} max-w-[10rem] block"><span class="block text-xs text-slate-500 mt-1">${esc(h)}</span></label>`).join('')}<p id="stErr" class="text-xs text-red-600 min-h-4"></p>${admin ? `<div>${btn('Save', 'saveSettings', { g: setTab })}</div>` : ro}</div>`);
+  }
+  shell(`<h2 class="text-xl font-semibold mb-1">Settings</h2><p class="text-sm text-slate-500 mb-3">${intro}</p>
+    <div class="flex gap-1 border-b border-slate-200 mb-4 overflow-x-auto">${tabs.map(([k, l, ic]) => `<button data-a="setTab" data-v="${k}" class="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 -mb-px whitespace-nowrap shrink-0 ${setTab === k ? 'border-slate-900 text-slate-900' : 'border-transparent text-slate-600 hover:text-slate-900'}">${ico(ic)}${l}</button>`).join('')}</div>${body}`);
 }
 
 let supF = { q: '', ex: '' };   // Suppliers list: search text and the one exception filter that is on ('' = all)
@@ -1750,7 +1807,8 @@ async function ofZip(id) {
 // ---- audit trail ---------------------------------------------------------------
 const AUD_AREA = { documents: 'Document', parties: 'Party', party_contacts: 'Contact', skus: 'Product (SKU)', cases: 'Case', case_events: 'Case note', requests: 'Request', request_events: 'Request event', request_campaigns: 'Request campaign', cmrt_declarations: 'CMRT declaration', cmrt_smelters: 'CMRT smelter', reference_list_loads: 'Reference list load', classifications: 'Classification', ownership_links: 'Ownership link', ownership_submissions: 'Ownership submission', portal_links: 'Portal link', portal_events: 'Portal visit', published_reports: 'Customer report', profiles: 'User account', app_settings: 'Setting', document_types: 'Document type', screening_runs: 'Screening run', screenings: 'Screening', screening_hits: 'Screening hit', screening_clearances: 'Screening clearance', transactions: 'Order', transaction_lines: 'Order item', transaction_parties: 'Transaction party', country_rules: 'Country rule', rule_profiles: 'Rule profile' };
 const AUD_ACT = { insert: 'Created', update: 'Changed', delete: 'Deleted' };
-let auditF = { from: '', to: '', area: '', action: '', q: '' }, auditRows = [];
+const AUD_DEF = { from: '', to: '', area: '', action: '', q: '', row: '', rowLabel: '', page: 0, size: 50, dir: 'desc' };
+let auditF = { ...AUD_DEF }, auditRows = [], auditViewOk = null;   // auditViewOk: null = not tried yet, false = database part 15 not installed
 const auditLabel = (r) => { const d = r.new_data || r.old_data || {}; return d.title || d.name || d.subject || d.sku || d.matched_name || d.reference || d.email || d.key || d.code || d.file_name || (d.case_no ? '#' + d.case_no : '') || ''; };
 const clip = (v, n = 60) => { const t = v === null || v === undefined ? '-' : typeof v === 'object' ? JSON.stringify(v) : String(v); return t.length > n ? t.slice(0, n) + '…' : t; };
 function auditSummary(r) {
@@ -1762,24 +1820,42 @@ function auditSummary(r) {
 }
 const auditWho = (r) => r.actor_email || (r.actor ? r.actor : 'System or external visitor');
 const auditWhen = (t) => new Date(t).toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' });
+// Search covers the whole log on the server. With database part 15 (view v_audit_search) it looks at the user, area, record id and every value in the entry;
+// without it, it falls back to the user's email. "#123" finds entry number 123.
+const auditEntryNo = () => { const m = /^#(\d+)$/.exec(auditF.q.trim()); return m ? Number(m[1]) : null; };
+const auditSrc = () => (auditF.q.trim() && auditEntryNo() === null && auditViewOk !== false ? 'v_audit_search' : 'audit_log');
+const likeEsc = (t) => t.replace(/[\\%_]/g, '\\$&');
 const applyAF = (q) => {
   if (auditF.from) q = q.gte('at', new Date(auditF.from + 'T00:00:00').toISOString());
   if (auditF.to) q = q.lte('at', new Date(auditF.to + 'T23:59:59.999').toISOString());
   if (auditF.area) q = q.eq('table_name', auditF.area);
   if (auditF.action) q = q.eq('action', auditF.action);
+  if (auditF.row) q = q.eq('row_id', auditF.row);
+  const t = auditF.q.trim();
+  if (t) {
+    if (auditEntryNo() !== null) q = q.eq('id', auditEntryNo());
+    else if (auditSrc() === 'v_audit_search') q = q.ilike('search_text', '%' + likeEsc(t.toLowerCase()) + '%');
+    else q = q.ilike('actor_email', '%' + likeEsc(t) + '%');
+  }
   return q;
 };
-const auditMatch = (r) => { const q = auditF.q.trim().toLowerCase(); return !q || [auditSummary(r), auditWho(r), auditLabel(r), r.row_id, AUD_AREA[r.table_name] || r.table_name].join(' ').toLowerCase().includes(q); };
+// Runs a query built by build(); if the search view is missing, remembers that and runs it again against the plain log.
+async function auditFetch(build) {
+  let r = await build();
+  if (r.error && auditSrc() === 'v_audit_search' && /v_audit_search|schema cache|does not exist/i.test(r.error.message || '')) { auditViewOk = false; r = await build(); }
+  else if (!r.error && auditSrc() === 'v_audit_search') auditViewOk = true;
+  return r;
+}
 async function loadAuditAll(cap) {
   let out = [], from = 0, full = false;
   for (;;) {
-    const { data, error } = await applyAF(sb.from('audit_log').select('*')).order('id', { ascending: true }).range(from, from + 999);
+    const { data, error } = await auditFetch(() => applyAF(sb.from(auditSrc()).select('*')).order('id', { ascending: true }).range(from, from + 999));
     if (error) throw error;
     out = out.concat(data); full = data.length === 1000;
     if (!full || out.length >= cap) break; from += 1000;
   }
   const truncated = full && out.length >= cap; if (out.length > cap) out = out.slice(0, cap);
-  return { rows: out.filter(auditMatch), truncated };
+  return { rows: out, truncated };
 }
 async function verifyChain() {
   const box = $('#chainBox'); if (box) box.innerHTML = '<span class="text-slate-500">Verifying integrity…</span>';
@@ -1790,29 +1866,44 @@ async function verifyChain() {
 }
 async function renderAudit() {
   const inp = 'mt-1 w-full rounded-lg border border-slate-300 p-2 text-sm';
-  shell(`<div class="flex flex-wrap items-center gap-3 mb-4"><h2 class="text-xl font-semibold">Audit trail</h2><div id="chainBox" class="ml-auto text-sm"></div><p class="basis-full text-sm text-slate-500 -mt-1">The permanent record of who changed what, and when. Expected: the chain check below says it is intact. Entries cannot be edited or deleted, and each one is chained to the one before so any tampering shows.</p></div>
+  shell(`<div class="flex flex-wrap items-center gap-3 mb-4"><h2 class="text-xl font-semibold">Audit trail</h2><div id="chainBox" class="ml-auto text-sm"></div><p class="basis-full text-sm text-slate-500 -mt-1">The permanent record of who changed what, and when. Expected: the chain check says it is intact. Entries cannot be edited or deleted, and each one is chained to the one before so any tampering shows. Filters and search cover the whole log, shown a page at a time.</p></div>
   <div class="rounded-xl bg-white border border-slate-200 p-4 mb-4"><div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-5 items-end">
     <label class="text-sm">From<input id="aFrom" type="date" class="${inp}"></label><label class="text-sm">To<input id="aTo" type="date" class="${inp}"></label>
     <label class="text-sm">Area<select id="aArea" class="${inp}"><option value="">All areas</option>${Object.entries(AUD_AREA).sort((a, b) => a[1].localeCompare(b[1])).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></label>
     <label class="text-sm">Action<select id="aAct" class="${inp}"><option value="">All</option>${Object.entries(AUD_ACT).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></label>
-    <label class="text-sm">Search<input id="aQ" placeholder="User, record, change" class="${inp}"></label></div>
-    <div class="mt-3 flex flex-wrap gap-2">${btn('Apply filters', 'auditApply')}${btn('Export CSV', 'auditCsv', {}, 'ghost')}${btn('Print / save as PDF report', 'auditPrint', {}, 'ghost')}</div></div>
+    <label class="text-sm">Search<input id="aQ" placeholder="User, record name, any value, or #123" class="${inp}"></label></div>
+    <div class="mt-3 flex flex-wrap items-center gap-2"><span class="text-xs text-slate-500">Dates:</span>${[['today', 'Today'], ['7', 'Last 7 days'], ['30', 'Last 30 days'], ['year', 'This year'], ['all', 'All dates']].map(([k, l]) => `<button type="button" data-a="auditRange" data-d="${k}" class="rounded-full border border-slate-300 px-2.5 py-0.5 text-xs text-slate-600 hover:bg-slate-100">${l}</button>`).join('')}
+      <label class="ml-auto text-xs text-slate-500">Order <select id="aDir" class="rounded-lg border border-slate-300 p-1 text-sm text-slate-800"><option value="desc">Newest first</option><option value="asc">Oldest first</option></select></label>
+      <label class="text-xs text-slate-500">Per page <select id="aSize" class="rounded-lg border border-slate-300 p-1 text-sm text-slate-800">${AUD_SIZES.map((n) => `<option value="${n}">${n}</option>`).join('')}</select></label></div>
+    <div class="mt-3 flex flex-wrap gap-2">${btn('Apply filters', 'auditApply')}${btn('Reset', 'auditReset', {}, 'ghost')}${btn('Export CSV', 'auditCsv', {}, 'ghost')}${btn('Print / save as PDF report', 'auditPrint', {}, 'ghost')}</div></div>
   <div id="auditList"><p class="text-slate-500">Loading…</p></div>`);
-  $('#aFrom').value = auditF.from; $('#aTo').value = auditF.to; $('#aArea').value = auditF.area; $('#aAct').value = auditF.action; $('#aQ').value = auditF.q;
+  $('#aFrom').value = auditF.from; $('#aTo').value = auditF.to; $('#aArea').value = auditF.area; $('#aAct').value = auditF.action; $('#aQ').value = auditF.q; $('#aDir').value = auditF.dir; $('#aSize').value = String(auditF.size);
   $('#aQ').onkeydown = (e) => { if (e.key === 'Enter') actions.auditApply(); };
   verifyChain(); loadAuditList();
 }
+const AUD_SIZES = [25, 50, 100, 200];
+function auditPager(total, pages, jump) {
+  const f = auditF, from = total ? f.page * f.size + 1 : 0, to = Math.min(total, (f.page + 1) * f.size);
+  const b = (label, to2, off) => `<button data-a="auditGo" data-to="${to2}" ${off ? 'disabled' : ''} class="rounded-lg border border-slate-300 px-2.5 py-1 text-sm ${off ? 'text-slate-300' : 'hover:bg-slate-100'}">${label}</button>`;
+  return `<div class="flex flex-wrap items-center gap-2 text-sm text-slate-600"><span>${total ? `Showing ${from.toLocaleString()}–${to.toLocaleString()} of ${total.toLocaleString()}` : 'No entries'}</span><span class="ml-auto flex flex-wrap items-center gap-1.5">${b('« First', 'first', f.page === 0)}${b('‹ Previous', 'prev', f.page === 0)}<span class="px-1">Page ${jump ? `<input id="aPage" type="number" min="1" max="${pages}" value="${f.page + 1}" class="w-16 rounded-lg border border-slate-300 p-1 text-sm text-center">` : f.page + 1} of ${pages.toLocaleString()}</span>${b('Next ›', 'next', f.page >= pages - 1)}${b('Last »', 'last', f.page >= pages - 1)}</span></div>`;
+}
 async function loadAuditList() {
-  const { data, error, count } = await applyAF(sb.from('audit_log').select('*', { count: 'exact' })).order('id', { ascending: false }).limit(500);
+  const f = auditF, from = f.page * f.size;
+  const { data, error, count } = await auditFetch(() => applyAF(sb.from(auditSrc()).select('*', { count: 'exact' })).order('id', { ascending: f.dir === 'asc' }).range(from, from + f.size - 1));
   const box = $('#auditList'); if (!box) return;
   if (error) { box.innerHTML = `<div class="rounded-xl bg-red-50 border border-red-200 p-4 text-sm text-red-700">${esc(error.message)}</div>`; return; }
-  auditRows = data.filter(auditMatch);
-  box.innerHTML = `<p class="text-sm text-slate-500 mb-2">${count} matching entries${count > 500 ? ', showing the latest 500. Narrow the filters or export for the full set.' : ''}${auditF.q ? ` · ${auditRows.length} match the search` : ''}</p>
+  const total = count ?? data.length, pages = Math.max(1, Math.ceil(total / f.size));
+  if (f.page > pages - 1) { f.page = pages - 1; return loadAuditList(); }
+  auditRows = data;
+  const note = f.q.trim() && auditEntryNo() === null && auditViewOk === false ? '<div class="mb-2 rounded-xl bg-amber-50 border border-amber-200 p-3 text-sm text-amber-900">Search is limited to user emails until database part 15 is run. Run <b>compliance_schema_part15_audit_search.sql</b> in the Supabase SQL editor to search record names and every value.</div>' : '';
+  const chip = f.row ? `<div class="mb-2 flex flex-wrap items-center gap-2 rounded-xl bg-slate-100 border border-slate-200 p-2 text-sm"><span>Only entries for record <b>${esc(f.rowLabel || f.row)}</b> <span class="text-xs text-slate-500 font-mono">${esc(f.row)}</span></span>${btn('Show all entries', 'auditClearRow', {}, 'ghost')}</div>` : '';
+  box.innerHTML = `${note}${chip}<div class="mb-2">${auditPager(total, pages, true)}</div>
   <div class="rounded-xl bg-white border border-slate-200 overflow-x-auto"><table class="w-full text-sm"><thead class="text-left text-slate-500 border-b border-slate-200"><tr><th class="p-3">#</th><th class="p-3">When</th><th class="p-3">Who</th><th class="p-3">Action</th><th class="p-3">Record</th><th class="p-3">What changed</th><th class="p-3"></th></tr></thead>
   <tbody class="divide-y divide-slate-100">${auditRows.map((r) => `<tr><td class="p-3 text-slate-400">${r.id}</td><td class="p-3 whitespace-nowrap">${esc(auditWhen(r.at))}</td><td class="p-3">${esc(auditWho(r))}</td><td class="p-3">${badge(AUD_ACT[r.action], r.action === 'delete' ? 'red' : r.action === 'update' ? 'amber' : 'gray')}</td>
-  <td class="p-3"><div class="font-medium">${esc(AUD_AREA[r.table_name] || r.table_name)}</div><div class="text-xs text-slate-400 truncate max-w-[14rem]">${esc(auditLabel(r))}</div></td><td class="p-3 text-slate-600 max-w-md">${esc(auditSummary(r))}</td><td class="p-3 text-right">${btn('Details', 'auditRow', { id: r.id }, 'ghost')}</td></tr>`).join('') || '<tr><td colspan="7" class="p-8 text-center text-slate-500">No entries match.</td></tr>'}</tbody></table></div>`;
+  <td class="p-3"><div class="font-medium">${esc(AUD_AREA[r.table_name] || r.table_name)}</div><div class="text-xs text-slate-400 truncate max-w-[14rem]">${esc(auditLabel(r))}</div></td><td class="p-3 text-slate-600 max-w-md">${esc(auditSummary(r))}</td><td class="p-3 text-right">${btn('Details', 'auditRow', { id: r.id }, 'ghost')}</td></tr>`).join('') || '<tr><td colspan="7" class="p-8 text-center text-slate-500">No entries match. Try widening the dates or clearing the search.</td></tr>'}</tbody></table></div>
+  ${auditRows.length > 12 ? `<div class="mt-2">${auditPager(total, pages, false)}</div>` : ''}`;
 }
-function readFilters() { auditF = { from: $('#aFrom').value, to: $('#aTo').value, area: $('#aArea').value, action: $('#aAct').value, q: $('#aQ').value }; }
+function readFilters() { Object.assign(auditF, { from: $('#aFrom').value, to: $('#aTo').value, area: $('#aArea').value, action: $('#aAct').value, q: $('#aQ').value, dir: $('#aDir').value, size: Number($('#aSize').value) || 50 }); }
 async function exportAuditCsv() {
   toast('Preparing export…');
   try {
@@ -1830,7 +1921,7 @@ async function printAuditReport() {
     const company = typeof cs.data?.value === 'string' ? cs.data.value : '';
     const tz = Intl.DateTimeFormat().resolvedOptions().timeZone, now = new Date();
     const counts = {}; rows.forEach((r) => { const k = (AUD_AREA[r.table_name] || r.table_name) + '|' + r.action; counts[k] = (counts[k] || 0) + 1; });
-    const f = auditF, filt = [f.from && 'from ' + f.from, f.to && 'to ' + f.to, f.area && 'area: ' + (AUD_AREA[f.area] || f.area), f.action && 'action: ' + AUD_ACT[f.action], f.q && 'search: "' + f.q + '"'].filter(Boolean).join(', ') || 'none (all entries)';
+    const f = auditF, filt = [f.from && 'from ' + f.from, f.to && 'to ' + f.to, f.area && 'area: ' + (AUD_AREA[f.area] || f.area), f.action && 'action: ' + AUD_ACT[f.action], f.q && 'search: "' + f.q + '"', f.row && 'record: ' + (f.rowLabel || f.row)].filter(Boolean).join(', ') || 'none (all entries)';
     const last = rows[rows.length - 1];
     $('#printArea').innerHTML = `<h1>Compliance audit report</h1><div style="margin-top:2px">${esc(company)}</div>
     <p style="margin:8px 0">Generated ${esc(now.toLocaleString())} (${esc(tz)}) by ${esc(profile?.full_name || user?.email || '')}<br>Filters: ${esc(filt)}<br>Entries in this report: ${rows.length}${truncated ? ' (limited to the first 5,000; export the CSV for the full set)' : ''}${rows.length ? `<br>Entry range: #${rows[0].id} to #${last.id}, ${esc(auditWhen(rows[0].at))} to ${esc(auditWhen(last.at))}` : ''}</p>
@@ -1910,7 +2001,22 @@ async function mkCorrection() {
 const actions = {
   mkCorrection: () => mkCorrection(),
   copyFull: async () => { await navigator.clipboard.writeText(actions.crxFull || ''); toast('Email text copied'); },
-  auditApply: () => { readFilters(); loadAuditList(); },
+  auditApply: () => { readFilters(); auditF.page = 0; loadAuditList(); },
+  auditReset: () => { auditF = { ...AUD_DEF, size: auditF.size, dir: auditF.dir }; renderAudit(); },
+  auditClearRow: () => { auditF.row = ''; auditF.rowLabel = ''; auditF.page = 0; loadAuditList(); },
+  auditRange: ({ d }) => {
+    const iso = (x) => `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`, t = new Date();
+    if (d === 'all') { $('#aFrom').value = ''; $('#aTo').value = ''; }
+    else { const f0 = new Date(t); if (d === 'year') { f0.setMonth(0, 1); } else if (d !== 'today') f0.setDate(f0.getDate() - Number(d) + 1); $('#aFrom').value = iso(f0); $('#aTo').value = iso(t); }
+    actions.auditApply();
+  },
+  auditGo: ({ to }) => { auditF.page = to === 'first' ? 0 : to === 'prev' ? Math.max(0, auditF.page - 1) : to === 'next' ? auditF.page + 1 : 1e9; loadAuditList(); },
+  auditForRecord: ({ id }) => {
+    const r = auditRows.find((x) => String(x.id) === String(id)); if (!r || !r.row_id) return;
+    auditF = { ...AUD_DEF, size: auditF.size, dir: 'asc', row: r.row_id, rowLabel: [AUD_AREA[r.table_name] || r.table_name, auditLabel(r)].filter(Boolean).join(': ') };
+    closeModal(); renderAudit();
+  },
+
   auditCsv: () => { readFilters(); exportAuditCsv(); },
   auditPrint: () => { readFilters(); printAuditReport(); },
   auditRow: ({ id }) => {
@@ -1918,7 +2024,7 @@ const actions = {
     const pre = (o) => o ? `<pre class="mt-1 max-h-48 overflow-auto rounded bg-slate-50 border border-slate-200 p-2 text-xs">${esc(JSON.stringify(o, null, 2))}</pre>` : '<div class="text-xs text-slate-400">None</div>';
     modal(`<h3 class="text-lg font-semibold">Entry #${r.id}</h3><div class="mt-2 text-sm text-slate-600">${esc(auditWhen(r.at))} (UTC ${esc(new Date(r.at).toISOString())})<br>${esc(auditWho(r))} · ${esc(AUD_ACT[r.action])} · ${esc(AUD_AREA[r.table_name] || r.table_name)}${r.row_id ? ' · record ' + esc(r.row_id) : ''}</div>
       <div class="mt-3 text-sm font-medium">Before</div>${pre(r.old_data)}<div class="mt-3 text-sm font-medium">After</div>${pre(r.new_data)}
-      <div class="mt-3 text-xs text-slate-400 font-mono break-all">Previous hash ${esc(r.prev_hash)}<br>Entry hash ${esc(r.row_hash)}</div><div class="mt-4 text-right">${btn('Close', 'close', {}, 'ghost')}</div>`, true);
+      <div class="mt-3 text-xs text-slate-400 font-mono break-all">Previous hash ${esc(r.prev_hash)}<br>Entry hash ${esc(r.row_hash)}</div><div class="mt-4 flex flex-wrap justify-end gap-2">${r.row_id ? btn('All entries for this record', 'auditForRecord', { id: r.id }, 'ghost') : ''}${btn('Close', 'close', {}, 'ghost')}</div>`, true);
   },
   viewDoc: async ({ id }) => {
     const { data: d, error } = await sb.from('documents').select('id,title,doc_type,file_name,storage_path,sha256,status,issued_on,valid_until,source,notes,created_at,party:parties(name)').eq('id', id).single();
@@ -2140,7 +2246,7 @@ const actions = {
   dashAll: () => { dashFilter = null; dashArea = null; renderToday(); },
   dashArea: ({ k }) => { dashArea = dashArea === k ? null : k; renderToday(); },
   bell: () => { popMenu('bell', '#bellBtn', bellHtml(), 380); refreshBell(true); },
-  userMenu: () => popMenu('user', '#userBtn', `<div class="px-4 py-3 border-b border-slate-200"><div class="font-semibold">${esc(profile?.full_name || user?.email || '')}</div><div class="text-xs text-slate-500 break-all">${esc(user?.email || '')}</div><div class="text-xs text-slate-500">Role: ${esc(profile?.role || '')}</div></div><button data-a="chgPw" class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm hover:bg-slate-50">${ico('user')}Change password</button><button data-a="signout" class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm hover:bg-slate-50">${ico('logout')}Sign out</button>`, 260),
+  userMenu: () => popMenu('user', '#userBtn', `<div class="px-4 py-3 border-b border-slate-200"><div class="font-semibold">${esc(profile?.full_name || user?.email || '')}</div><div class="text-xs text-slate-500 break-all">${esc(user?.email || '')}</div><div class="text-xs text-slate-500">Role: ${esc(profile?.role || '')}</div></div><button data-a="nav" data-v="settings" class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm hover:bg-slate-50">${ico('sliders')}Settings</button><button data-a="chgPw" class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm hover:bg-slate-50">${ico('user')}Change password</button><button data-a="signout" class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm hover:bg-slate-50">${ico('logout')}Sign out</button>`, 260),
   bellGo: (d) => {
     closeNavMenu();
     if (d.rt === 'transactions') return actions.goTrade({ t: 'orders', id: d.id });
@@ -2153,6 +2259,41 @@ const actions = {
   },
   recSort: ({ k }) => { recF.dir = recF.sort === k ? -recF.dir : (k === 'date' || k === 'keep' ? -1 : 1); recF.sort = k; renderTrade(); },
   recClear: () => { recF = { q: '', type: '', order: '', keep: '', sort: recF.sort, dir: recF.dir }; renderTrade(); },
+  setTab: ({ v }) => { setTab = v; renderSettings(); },
+  saveCompany: async () => {
+    const v = $('#stCompany').value.trim(), err = (m) => ($('#stErr').textContent = m);
+    if (!v) return err('Enter the company name.');
+    const r = await sb.from('app_settings').upsert([{ key: 'company_name', value: v }], { onConflict: 'key' });
+    if (r.error) return err(r.error.message); toast('Saved.'); renderSettings();
+  },
+  saveSettings: async ({ g }) => {
+    const grp = SET_GROUPS[g], err = (m) => ($('#stErr').textContent = m), rows = [], vals = {};
+    if (!grp) return;
+    for (const [k, l, , mn, mx, st] of grp.fields) {
+      const n = Number($('#st_' + k).value);
+      if ($('#st_' + k).value === '' || !isFinite(n) || n < mn || n > mx) return err(`${l}: enter a number from ${mn} to ${mx}.`);
+      if (st >= 1 && !Number.isInteger(n)) return err(`${l}: enter a whole number.`);
+      vals[k] = n; rows.push({ key: k, value: n });
+    }
+    if (vals.screen_likely_threshold != null && vals.screen_likely_threshold < vals.screen_review_threshold) return err('The likely match score cannot be lower than the possible match score.');
+    const r = await sb.from('app_settings').upsert(rows, { onConflict: 'key' });
+    if (r.error) return err(r.error.message); workCache = null; toast('Saved.'); renderSettings(); refreshBell(true);
+  },
+  userOn: async ({ id }) => {
+    const role = $('#ur_' + id)?.value || 'viewer';
+    const r = await sb.from('profiles').update({ active: true, role }).eq('id', id).select('id');
+    if (r.error) return toast(r.error.message);
+    if (!r.data || !r.data.length) return toast('Not saved. Only an admin can change users.');
+    toast('Activated.'); renderSettings();
+  },
+  userOffAsk: ({ id, name }) => modal(`<h3 class="text-lg font-semibold">Deactivate ${esc(name)}?</h3><p class="text-sm text-slate-600 mt-2">They lose all access straight away. Their history stays in the Audit log, and you can activate them again later.</p><div class="mt-4 flex justify-end gap-2">${btn('Cancel', 'close', {}, 'ghost')}${btn('Deactivate', 'userOff', { id }, 'danger')}</div>`),
+  userOff: async ({ id }) => {
+    const r = await sb.from('profiles').update({ active: false }).eq('id', id).select('id');
+    closeModal();
+    if (r.error) return toast(r.error.message);
+    if (!r.data || !r.data.length) return toast('Not saved. Only an admin can change users.');
+    toast('Deactivated.'); renderSettings();
+  },
   featureAsk: ({ k, on }) => {
     const f = FEATURES.find((x) => x.key === k); if (!f) return;
     modal(`<h3 class="text-lg font-semibold">${on === '1' ? 'Turn on' : 'Turn off'} ${f.name}?</h3>
@@ -2426,17 +2567,23 @@ const actions = {
   copy: async () => { await navigator.clipboard.writeText($('#lkU').value); toast('Copied'); }
 };
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeNavMenu(); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.id === 'aPage') { auditF.page = Math.max(0, (Math.round(Number(e.target.value)) || 1) - 1); loadAuditList(); } });
+document.addEventListener('change', (e) => { if (e.target.id === 'aSize' || e.target.id === 'aDir') { readFilters(); auditF.page = 0; loadAuditList(); } if (e.target.id === 'aPage') { auditF.page = Math.max(0, (Math.round(Number(e.target.value)) || 1) - 1); loadAuditList(); } });
 document.addEventListener('click', (e) => { if (!e.target.closest('#navmenu') && !e.target.closest('[data-a="menu"],[data-a="bell"],[data-a="userMenu"]')) closeNavMenu(); });
 document.addEventListener('click', (e) => { const b = e.target.closest('[data-a]'); if (b && actions[b.dataset.a]) actions[b.dataset.a](b.dataset); });
 document.addEventListener('change', (e) => { if (e.target.id === 'rqType') { const s = $('#rqSub'); if (s && !s.dataset.t) s.value = `${new Date().getFullYear()} ${actions.rq.types.find((x) => x.code === e.target.value)?.name || ''}`; } });
 document.addEventListener('input', (e) => { if (e.target.id === 'rqSub') e.target.dataset.t = '1'; });
 document.addEventListener('change', (e) => {
+  if (e.target.dataset && e.target.dataset.urole && e.target.closest('td')) {
+    const sel = e.target, id = sel.dataset.urole;
+    sb.from('profiles').update({ role: sel.value }).eq('id', id).select('id').then((r) => { toast(r.error ? r.error.message : (!r.data || !r.data.length) ? 'Not saved. Only an admin can change users.' : 'Role saved.'); if (r.error || !r.data || !r.data.length) renderSettings(); });
+  }
   if (e.target.id === 'ofGov') { const b = $('#ofGovBox'); if (b) b.classList.toggle('hidden', !e.target.checked); }
   if (e.target.dataset && e.target.dataset.rule) sb.from('order_check_rules').update({ level: e.target.value, updated_at: new Date().toISOString() }).eq('item', e.target.dataset.rule).then((r) => toast(r.error ? r.error.message : 'Saved'));
 });
 
 // ---- boot & auth ---------------------------------------------------------------
-function route() { if (OLD_VIEWS.includes(view) || !viewAllowed(view)) { view = 'today'; tradeTab = 'orders'; } ({ features: renderFeatures, ownership: renderOwnership, customer: renderCustomer, today: renderToday, suppliers: renderSuppliers, supplier: renderSupplier, skus: renderSkus, requests: renderRequests, minerals: renderMinerals, screening: renderScreening, trade: renderTrade, review: renderReview, audit: renderAudit, govdata: renderGovData })[view](); }
+function route() { if (OLD_VIEWS.includes(view) || !viewAllowed(view)) { view = 'today'; tradeTab = 'orders'; } ({ settings: renderSettings, features: () => { setTab = 'features'; renderSettings(); }, ownership: renderOwnership, customer: renderCustomer, today: renderToday, suppliers: renderSuppliers, supplier: renderSupplier, skus: renderSkus, requests: renderRequests, minerals: renderMinerals, screening: renderScreening, trade: renderTrade, review: renderReview, audit: renderAudit, govdata: renderGovData })[view](); }
 
 function loginScreen(msg = '') {
   $('#app').innerHTML = `<div class="min-h-screen grid place-items-center p-4"><form id="lf" class="w-full max-w-sm rounded-2xl bg-white border border-slate-200 shadow-sm p-8">
