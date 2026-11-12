@@ -49,6 +49,10 @@ main div:has(>table){overflow-x:auto}
 // ---- VERSION: increase with every revision (also update the user guide's "applies to") ----
 // 1.11.0 Records shows just "Audit log" when trade compliance is off. Suppliers: Import and Export (CSV) and exception filters. Every page opens with a line saying what is expected.
 //        Every dialog has an X in its corner. Regulatory data: the "Where to update each one" section is gone; Load list is a button on the table row.
+// 1.18.0 Suppliers page follows the new design: cards (Total, Compliant, Missing CMRT, Smelter reviews, Open requests), Compliance status / Issue type / CMRT year filters with Clear filters, a status + open issues + issue types + next action table, sortable by name, with paging.
+// 1.17.0 Suppliers page restyled: heading and subtitle, exception cards (click to filter), search with Conflict minerals and Country drop-downs, rounded table, Import/Export under a ... button and Open/Edit under a ... button on each row.
+// 1.16.1 Header icon order is now bell, Configuration (wrench), person.
+// 1.16.0 Dashboard filters (Priority, Issue type) are multi-select and share one row with Search; Issue type is a checklist drop-down.
 // 1.15.1 The Open items by severity bar is 75% of its former height (the key sits in one row).
 // 1.15.0 Configuration (wrench) now holds only Features, Organization and User Management. Suppliers, Regulatory data (was Government data) and Audit log are tabs; Trade compliance is a menu (Products, Classifications, Customers, Rules, Customs records). New Organization and User Management pages (database part 15).
 // 1.14.2 Smaller type: body text is 13px and the other sizes scale with it (xs 11, sm 13, base 15, lg 17, xl 19, 2xl 22, 3xl 28; 14px body on screens 1536px and wider).
@@ -100,7 +104,7 @@ main div:has(>table){overflow-x:auto}
 //        government-contract flags (FAR Part 12 / TAA / BAA), shipment-check levels (Trade > Rules), order file download.
 //        Fixed: date-only values no longer show a day early in US time zones.
 // 1.0.0  First versioned release. Added the user guide link.
-const APP_VERSION = '1.15.1';
+const APP_VERSION = '1.18.0';
 // ---- CONFIG: paste your Supabase project values -------------------------------
 const CFG = {
   url: 'https://sjwarllnehssyphoormc.supabase.co',                    // https://xxxx.supabase.co
@@ -148,7 +152,7 @@ const ICON_PATHS = {
   landmark: '<path d="M3 22h18M6 18v-7M10 18v-7M14 18v-7M18 18v-7M12 2l8 5H4z"/>',
   inbox: '<path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.5 5.1 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.5-6.9A2 2 0 0 0 16.8 4H7.2a2 2 0 0 0-1.7 1.1z"/>',
   book: '<path d="M2 4h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 4h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>',
-  chevd: '<path d="m6 9 6 6 6-6"/>', chevu: '<path d="m18 15-6-6-6 6"/>', chevr: '<path d="m9 18 6-6-6-6"/>',
+  chevd: '<path d="m6 9 6 6 6-6"/>', chevl: '<path d="m15 18-6-6 6-6"/>', sortup: '<path d="m5 12 7-7 7 7"/><path d="M12 19V5"/>', sortdown: '<path d="M12 5v14"/><path d="m19 12-7 7-7-7"/>', chevu: '<path d="m18 15-6-6-6 6"/>', chevr: '<path d="m9 18 6-6-6-6"/>',
   info: '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>', alert: '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4M12 17h.01"/>',
   dots: '<circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>', target: '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
   cal: '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',
@@ -310,8 +314,8 @@ function shell(inner) {
     <div class="font-semibold tracking-tight mr-4">Conformality <span class="text-xs font-normal text-slate-400">v${APP_VERSION}</span></div>
     <nav class="flex gap-1 order-last w-full overflow-x-auto 2xl:order-none 2xl:w-auto 2xl:overflow-visible">${NAV.map((n, gi) => gi === cfgI ? '' : n.items ? group(n, gi) : tab(n)).join('')}</nav>
     <div class="ml-auto flex items-center gap-3"><a href="./conformality_user_guide.html" target="_blank" rel="noopener" class="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium border border-slate-300 hover:bg-slate-100 text-slate-700">${ico('book')}User guide</a>
-      ${cfgBtn}
       <button id="bellBtn" data-a="bell" aria-haspopup="true" title="Overdue items, blocked orders and escalations" class="${iconBtn}">${ico('bell', 'h-5 w-5')}<span id="bellCount" class="${nb ? '' : 'hidden'} absolute -top-1.5 -right-1.5 rounded-full bg-amber-600 px-1.5 text-[10px] font-semibold leading-4 text-white">${nb > 99 ? '99+' : nb}</span></button>
+      ${cfgBtn}
       <button id="userBtn" data-a="userMenu" aria-haspopup="true" title="${esc(profile?.full_name || user?.email || 'Account')}" class="${iconBtn}">${ico('user', 'h-5 w-5')}</button></div>
   </div></header>
   <main class="max-w-[1920px] mx-auto px-4 lg:px-8 py-5 lg:py-6">${inner}</main>`;
@@ -328,7 +332,7 @@ const TONE = { high: 'red', medium: 'amber', low: 'gray' };
 const ROUTE_TAB = { documents: 'docs', ownership_submissions: 'screening', requests: 'docs', parties: 'overview', cases: 'screening' };
 
 // ---- Dashboard ---------------------------------------------------------------
-let dashPri = 'all', dashCat = 'all', dashQ = '', dashDesc = false, dash = null;   // dashPri: all | high | medium | low; dashCat: all or a CATS key
+let dashPri = new Set(), dashCat = new Set(), dashMs = null, dashQ = '', dashDesc = false, dash = null;   // multi-select filters: empty set = all; dashPri holds high|medium|low, dashCat holds CATS keys; dashMs = the open filter drop-down
 const dashOpen = new Set();
 const SEV = { high: 'High', medium: 'Medium', low: 'Low' };
 // category -> [label, icon, pill colours]
@@ -374,7 +378,7 @@ const catPill = (k) => { const c = CATS[k]; return `<span class="inline-flex ite
 
 function dashRows() {
   const q = dashQ.trim().toLowerCase();
-  const items = dash.items.filter((x) => (dashPri === 'all' || x.severity === dashPri) && (dashCat === 'all' || x.cat === dashCat) && (!q || (x.title + ' ' + x.detail + ' ' + CATS[x.cat][0]).toLowerCase().includes(q)));
+  const items = dash.items.filter((x) => (!dashPri.size || dashPri.has(x.severity)) && (!dashCat.size || dashCat.has(x.cat)) && (!q || (x.title + ' ' + x.detail + ' ' + CATS[x.cat][0]).toLowerCase().includes(q)));
   const grp = items.filter((x) => x.kind === 'missing_cmrt'), rows = (grp.length > 1 ? items.filter((x) => x.kind !== 'missing_cmrt') : items).map((x) => ({ id: x.uid, sev: x.severity, due: x.due_on || '9', cat: x.cat, w: x }));
   if (grp.length > 1) rows.push({ id: 'g-cmrt', sev: grp.map((x) => x.severity).sort((a, b) => ORDER[a] - ORDER[b])[0], due: grp.map((x) => x.due_on || '9').sort()[0], cat: 'cmrt', group: grp });
   const d = dashDesc ? -1 : 1;
@@ -407,7 +411,8 @@ function paintDashList() { const el = document.getElementById('dashList'); if (e
 function paintDash() {
   const items = dash.items, total = items.length, cnt = (k, v) => items.filter((x) => x[k] === v).length;
   const nCat = {}; for (const x of items) nCat[x.cat] = (nCat[x.cat] || 0) + 1;
-  if (dashCat !== 'all' && !nCat[dashCat]) dashCat = 'all';
+  for (const k of [...dashCat]) if (!nCat[k]) dashCat.delete(k);
+  const kOn = (k) => dashCat.size === 1 && dashCat.has(k);
   const sev = { high: cnt('severity', 'high'), medium: cnt('severity', 'medium'), low: cnt('severity', 'low') };
   const pct = (n) => total ? (n / total * 100).toFixed(1) : '0.0';
   // compliance ring: suppliers with an accepted, unexpired CMRT and no flagged smelters
@@ -416,13 +421,18 @@ function paintDash() {
   const ring = `<div class="relative h-20 w-20 shrink-0"><svg viewBox="0 0 80 80" class="h-20 w-20 -rotate-90"><circle cx="40" cy="40" r="34" fill="none" stroke="#e2e8f0" stroke-width="8"/><circle cx="40" cy="40" r="34" fill="none" stroke="${ringCol}" stroke-width="8" stroke-linecap="round" stroke-dasharray="${(C * pc / 100).toFixed(1)} ${C.toFixed(1)}"/></svg><span class="absolute inset-0 flex items-center justify-center text-xl font-bold">${sup ? pc + '%' : '-'}</span></div>`;
   const smrParty = new Set(items.filter((x) => x.cat === 'smr').map((x) => x.party_id || x.uid)).size;
   const card = 'rounded-2xl bg-white border border-slate-200 shadow-sm';
-  const kpi = (k, icon, tone, label, n, subt) => `<button data-a="dashCat" data-k="${k}" aria-pressed="${dashCat === k}" class="${card} flex items-center gap-4 px-5 py-4 text-left hover:border-slate-400 ${dashCat === k ? 'ring-2 ring-slate-900 border-slate-900' : ''}"><span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${tone}">${ico(icon, 'h-6 w-6')}</span><span class="min-w-0 flex-1"><span class="block font-semibold text-slate-900">${label}</span><span class="block text-3xl font-bold leading-tight text-slate-900">${n}</span><span class="block text-sm text-slate-600">${subt}</span></span>${ico('chevr', 'h-5 w-5 shrink-0 text-slate-900')}</button>`;
+  const kpi = (k, icon, tone, label, n, subt) => `<button data-a="dashKpi" data-k="${k}" aria-pressed="${kOn(k)}" class="${card} flex items-center gap-4 px-5 py-4 text-left hover:border-slate-400 ${kOn(k) ? 'ring-2 ring-slate-900 border-slate-900' : ''}"><span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${tone}">${ico(icon, 'h-6 w-6')}</span><span class="min-w-0 flex-1"><span class="block font-semibold text-slate-900">${label}</span><span class="block text-3xl font-bold leading-tight text-slate-900">${n}</span><span class="block text-sm text-slate-600">${subt}</span></span>${ico('chevr', 'h-5 w-5 shrink-0 text-slate-900')}</button>`;
   const seg = (k, bg) => sev[k] ? `<div class="flex min-w-[2.5rem] items-center justify-center text-sm font-semibold ${bg}" style="width:${pct(sev[k])}%">${sev[k]}${sev[k] / total > .12 ? ` (${pct(sev[k])}%)` : ''}</div>` : '';
   const lg = (k, c) => `<div class="flex items-center gap-2.5 text-sm text-slate-800"><span class="h-4 w-4 rounded ${c}"></span>${SEV[k]}: <b class="font-semibold">${sev[k]}</b> (${pct(sev[k]).replace('.0', '')}%)</div>`;
   const chip = (on, act, data, inner) => `<button data-a="${act}" ${data} aria-pressed="${on}" class="inline-flex items-center gap-2 rounded-full border bg-white px-3 py-1.5 text-sm font-medium text-slate-900 shadow-sm ${on ? 'border-slate-900 ring-1 ring-slate-900' : 'border-slate-200 hover:border-slate-400'}">${inner}</button>`;
   const num = (n, t) => `<span class="rounded-full px-2 py-0.5 text-xs font-semibold ${t}">${n}</span>`;
-  const catChip = (k) => `<button data-a="dashCat" data-k="${k}" aria-pressed="${dashCat === k}" class="inline-flex items-center gap-1.5 rounded-lg border bg-white px-2.5 py-1.5 text-sm text-slate-900 shadow-sm ${dashCat === k ? 'border-slate-900 ring-1 ring-slate-900' : 'border-slate-200 hover:border-slate-400'}"><span class="text-slate-700">${ico(CATS[k][1], 'h-4 w-4')}</span>${CATS[k][0]}${num(nCat[k], 'bg-amber-100 text-amber-800')}</button>`;
   const selCls = 'w-full appearance-none rounded-lg border border-slate-200 bg-white py-1.5 pl-3 pr-8 text-sm text-slate-900 shadow-sm';
+  // multi-select drop-down: a button that opens a checklist (stays open while you tick; click elsewhere to close)
+  const msDrop = (g, allLabel, opts, set) => {
+    const label = !set.size ? allLabel : set.size === 1 ? (opts.find((o) => set.has(o[0])) || [0, allLabel])[1] : set.size + ' selected', open = dashMs === g;
+    return `<div class="relative" data-mswrap><button data-a="dashMsOpen" data-g="${g}" aria-haspopup="listbox" aria-expanded="${open}" class="${selCls} flex items-center text-left ${set.size ? 'border-slate-900' : ''}"><span class="truncate">${esc(label)}</span><span class="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-700">${ico('chevd')}</span></button>
+      ${open ? `<div role="listbox" aria-multiselectable="true" class="absolute left-0 top-full z-30 mt-1 w-56 max-w-[80vw] rounded-xl border border-slate-200 bg-white p-1 shadow-lg">${opts.map(([k, l, n]) => `<button data-a="dashMs" data-g="${g}" data-k="${k}" role="option" aria-selected="${set.has(k)}" class="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-sm hover:bg-slate-100"><span class="flex h-4 w-4 shrink-0 items-center justify-center rounded border ${set.has(k) ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-300 bg-white'}">${set.has(k) ? '<span class="text-[10px] leading-none">&#10003;</span>' : ''}</span><span class="flex-1 truncate">${esc(l)}</span>${num(n, 'bg-slate-100 text-slate-700')}</button>`).join('')}${set.size ? `<button data-a="dashMs" data-g="${g}" data-k="" class="mt-1 w-full rounded-lg border-t border-slate-100 px-2.5 py-1.5 text-left text-sm text-slate-600 hover:bg-slate-100">Clear selection</button>` : ''}</div>` : ''}</div>`;
+  };
   const catKeys = Object.keys(CATS).filter((k) => nCat[k]);
   const nMiss = items.filter((x) => x.kind === 'missing_cmrt').length;
   const upd = new Date(dash.at).toLocaleString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
@@ -444,16 +454,14 @@ function paintDash() {
       <section id="dashAttn" class="${card} p-5">
         <div class="flex flex-wrap items-center justify-between gap-4"><div class="flex items-center gap-4"><span class="flex h-12 w-12 items-center justify-center rounded-xl bg-red-50 text-red-600">${ico('alert', 'h-7 w-7')}</span><div><h2 class="text-2xl font-bold tracking-tight text-slate-900">Requires attention</h2><p class="text-slate-600">${total ? `Review and address the ${total} open compliance item${total > 1 ? 's' : ''}.` : 'Nothing is open.'}</p></div></div>
           ${nMiss ? `<button data-a="dashReqAll" class="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-5 py-3 font-semibold text-white hover:bg-slate-700">${ico('send', 'h-5 w-5')}Request missing CMRTs (${nMiss})</button>` : ''}</div>
-        <div class="mt-4 flex flex-wrap items-end gap-x-4 gap-y-3 2xl:flex-nowrap">
-          <div class="min-w-0 flex-1 basis-40 2xl:flex-none"><div class="mb-1 text-sm font-semibold text-slate-800">Priority</div>
-            <div class="hidden gap-2 2xl:flex">${chip(dashPri === 'all', 'dashPri', 'data-k="all"', `All ${num(total, 'bg-slate-100 text-slate-700')}`)}${['high', 'medium', 'low'].map((s) => chip(dashPri === s, 'dashPri', `data-k="${s}"`, `${SEV[s]} ${num(sev[s], s === 'high' ? 'bg-red-100 text-red-700' : s === 'medium' ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-700')}`)).join('')}</div>
-            <label class="relative block 2xl:hidden"><select id="dashPriSel" aria-label="Priority" class="${selCls}"><option value="all" ${dashPri === 'all' ? 'selected' : ''}>All (${total})</option>${['high', 'medium', 'low'].map((s) => `<option value="${s}" ${dashPri === s ? 'selected' : ''}>${SEV[s]} (${sev[s]})</option>`).join('')}</select><span class="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-700">${ico('chevd')}</span></label></div>
+        <div class="mt-4 flex flex-wrap items-end gap-x-3 gap-y-3 md:flex-nowrap">
+          <div class="min-w-0 flex-1 basis-36 2xl:flex-none"><div class="mb-1 text-sm font-semibold text-slate-800">Priority</div>
+            <div class="hidden gap-1.5 2xl:flex">${chip(!dashPri.size, 'dashPri', 'data-k="all"', `All ${num(total, 'bg-slate-100 text-slate-700')}`)}${['high', 'medium', 'low'].map((s) => chip(dashPri.has(s), 'dashPri', `data-k="${s}"`, `${SEV[s]} ${num(sev[s], s === 'high' ? 'bg-red-100 text-red-700' : s === 'medium' ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-700')}`)).join('')}</div>
+            <div class="2xl:hidden">${msDrop('pri', 'All priorities', ['high', 'medium', 'low'].map((s) => [s, SEV[s], sev[s]]), dashPri)}</div></div>
           <div class="hidden h-9 w-px bg-slate-200 2xl:block"></div>
-          <div class="min-w-0 flex-1 basis-40 2xl:flex-auto"><div class="mb-1 text-sm font-semibold text-slate-800">Issue type</div><div class="flex items-center gap-2">
-            <label class="relative block w-full 2xl:w-auto"><select id="dashCat" aria-label="Issue type" class="${selCls}"><option value="all">All categories</option>${catKeys.map((k) => `<option value="${k}" ${dashCat === k ? 'selected' : ''}>${CATS[k][0]} (${nCat[k]})</option>`).join('')}</select><span class="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-700">${ico('chevd')}</span></label>
-            <div class="hidden gap-2 2xl:flex">${catKeys.slice(0, 4).map(catChip).join('')}</div></div></div>
+          <div class="min-w-0 flex-1 basis-36 md:max-w-[15rem]"><div class="mb-1 text-sm font-semibold text-slate-800">Issue type</div>${msDrop('cat', 'All categories', catKeys.map((k) => [k, CATS[k][0], nCat[k]]), dashCat)}</div>
+          <div class="min-w-0 flex-[2] basis-48"><div class="mb-1 text-sm font-semibold text-slate-800">Search</div><label class="relative block"><span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-600">${ico('search', 'h-5 w-5')}</span><input id="dashQ" type="search" value="${esc(dashQ)}" placeholder="Search issues..." class="w-full rounded-lg border border-slate-200 bg-white py-1.5 pl-10 pr-3 text-sm shadow-sm"></label></div>
         </div>
-        <label class="relative mt-3 block sm:max-w-sm"><span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-600">${ico('search', 'h-5 w-5')}</span><input id="dashQ" type="search" value="${esc(dashQ)}" placeholder="Search issues..." class="w-full rounded-lg border border-slate-200 bg-white py-1.5 pl-10 pr-3 text-sm shadow-sm"></label>
         <div id="dashList" class="mt-4">${dashListHtml()}</div>
       </section>
     </div>`);
@@ -566,12 +574,38 @@ async function renderUsers() {
     <div class="rounded-xl bg-white border border-slate-200 overflow-x-auto max-w-4xl"><table class="w-full text-sm"><thead class="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500"><tr><th class="p-3">Name</th><th class="p-3">Role</th><th class="p-3">Status</th><th class="p-3"></th></tr></thead><tbody>${userRows.map(row).join('') || '<tr><td class="p-3 text-slate-500" colspan="4">No users found.</td></tr>'}</tbody></table></div>`);
 }
 
-let supF = { q: '', ex: '' };   // Suppliers list: search text and the one exception filter that is on ('' = all)
-function applySupFilter() {
-  const q = supF.q.trim().toLowerCase(); let n = 0, total = 0;
-  document.querySelectorAll('#supBody tr').forEach((tr) => { total++; const ok = (!supF.ex || (tr.dataset.ex || '').split(' ').includes(supF.ex)) && (!q || (tr.dataset.q || '').includes(q)); tr.style.display = ok ? '' : 'none'; if (ok) n++; });
-  document.querySelectorAll('.supChip').forEach((b) => { const on = b.dataset.k === supF.ex; b.setAttribute('aria-pressed', on); b.classList.toggle('border-slate-900', on); b.classList.toggle('ring-2', on); b.classList.toggle('ring-slate-900', on); b.classList.toggle('bg-slate-50', on); b.classList.toggle('border-slate-200', !on); b.classList.toggle('bg-white', !on); });
-  const c = document.getElementById('supCount'); if (c) c.textContent = `${n} of ${total} supplier${total === 1 ? '' : 's'}`;
+let supF = { q: '', st: '', is: '', yr: '', sort: 'asc', page: 1 };   // Suppliers list filters: search text, status (act | prog | ok), issue type, CMRT year, name sort, page
+const SUP_PAGE = 10;
+let supRows = [];
+const SUP_ISSUES = { missing: ['Missing CMRT', 'filecheck', 'text-red-500'], expired: ['CMRT expired', 'filecheck', 'text-red-500'], review: ['CMRT to review', 'eye', 'text-amber-500'], gaps: ['Accepted with gaps', 'filecheck', 'text-amber-500'], smelter: ['Smelter review', 'shield', 'text-amber-500'], match: ['Screening match', 'shield', 'text-red-500'], request: ['Open request', 'send', 'text-blue-500'], unscreened: ['Not screened', 'shield', 'text-slate-500'] };
+const SUP_ACT = ['missing', 'expired', 'review', 'gaps', 'smelter', 'match'];   // issues that make a supplier "Action needed"; the rest are "In progress"
+const SUP_ST = { act: ['Action needed', 'alert', 'bg-red-100 text-red-700'], prog: ['In progress', 'clock', 'bg-amber-100 text-amber-700'], ok: ['Compliant', 'check', 'bg-emerald-100 text-emerald-700'] };
+function supFiltered() {
+  const q = supF.q.trim().toLowerCase();
+  return supRows.filter((x) => (!supF.st || x.st === supF.st) && (!supF.is || x.is.includes(supF.is)) && (!supF.yr || x.years.includes(supF.yr)) && (!q || x.q.includes(q))).sort((a, b) => a.s.name.localeCompare(b.s.name) * (supF.sort === 'asc' ? 1 : -1));
+}
+function supRowHtml(x) {
+  const { s } = x, [sl, si, sc] = SUP_ST[x.st], [nl, na, nd] = x.next;
+  return `<tr class="hover:bg-slate-50">
+    <td class="p-3"><button data-a="openSupplier" data-id="${esc(s.party_id)}" class="text-left font-semibold text-slate-900 hover:underline">${esc(s.name)}</button><div class="text-xs text-slate-500">${esc(s.country || '')}${FEAT.trade ? ` · ${s.active_skus} active products (SKUs)` : ''}${x.contact ? ` · ${esc(x.contact)}` : ' · No contact yet'}</div></td>
+    <td class="p-3"><span class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1 text-sm font-medium ${sc}">${ico(si, 'h-4 w-4')}${sl}</span></td>
+    <td class="p-3 text-center font-semibold">${x.is.length}</td>
+    <td class="p-3"><div class="flex flex-wrap gap-1.5">${x.is.map((k) => `<span class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-slate-100 px-2.5 py-1 text-xs text-slate-800"><span class="${SUP_ISSUES[k][2]}">${ico(SUP_ISSUES[k][1], 'h-4 w-4')}</span>${SUP_ISSUES[k][0]}</span>`).join('')}</div></td>
+    <td class="p-3 whitespace-nowrap text-slate-700">${s.valid_until ? `<span class="inline-flex items-center gap-1.5"><span class="text-slate-500">${ico('cal', 'h-4 w-4')}</span>${fmt(s.valid_until)}</span>` : '<span class="text-slate-400">-</span>'}</td>
+    <td class="p-3 text-right whitespace-nowrap">${btn(nl, na, nd, 'ghost')}<button data-a="supRowMenu" data-id="${esc(s.party_id)}" aria-haspopup="true" aria-label="More actions for ${esc(s.name)}" class="ml-1 inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100 align-middle">${ico('dots', 'h-5 w-5')}</button></td></tr>`;
+}
+function paintSup() {
+  const list = supFiltered(), pages = Math.max(1, Math.ceil(list.length / SUP_PAGE)); supF.page = Math.min(Math.max(1, supF.page), pages);
+  const from = (supF.page - 1) * SUP_PAGE, part = list.slice(from, from + SUP_PAGE);
+  const body = document.getElementById('supBody'); if (!body) return;
+  body.innerHTML = part.map(supRowHtml).join('') || `<tr><td class="p-8 text-center text-slate-500" colspan="6">${supRows.length ? 'No suppliers match these filters.' : 'No suppliers yet.'}</td></tr>`;
+  const c = document.getElementById('supCount'); if (c) c.textContent = list.length ? `Showing ${from + 1}-${from + part.length} of ${list.length} supplier${list.length === 1 ? '' : 's'}` : 'No suppliers';
+  const nums = pages <= 7 ? Array.from({ length: pages }, (_, i) => i + 1) : [...new Set([1, 2, supF.page - 1, supF.page, supF.page + 1, pages - 1, pages].filter((p) => p >= 1 && p <= pages))].sort((a, b) => a - b);
+  const pb = (inner, p, on, dis) => `<button data-a="supPage" data-p="${p}" ${dis ? 'disabled' : ''} ${on ? 'aria-current="page"' : ''} class="inline-flex h-9 min-w-[2.25rem] items-center justify-center rounded-lg border px-2 text-sm ${on ? 'border-slate-900 bg-slate-900 font-semibold text-white' : 'border-slate-200 bg-white text-slate-800 hover:bg-slate-100'} ${dis ? 'opacity-40' : ''}">${inner}</button>`;
+  const pg = document.getElementById('supPager'); if (pg) pg.innerHTML = pages > 1 ? pb(ico('chevl'), supF.page - 1, false, supF.page <= 1) + nums.map((p, i) => (i && p - nums[i - 1] > 1 ? '<span class="px-1 text-slate-400">...</span>' : '') + pb(p, p, p === supF.page)).join('') + pb(ico('chevr'), supF.page + 1, false, supF.page >= pages) : '';
+  document.querySelectorAll('.supChip').forEach((b) => { const k = b.dataset.k, on = k === 'ok' ? supF.st === 'ok' && !supF.is : k ? supF.is === k && !supF.st : false; b.setAttribute('aria-pressed', on); b.classList.toggle('border-slate-900', on); b.classList.toggle('ring-2', on); b.classList.toggle('ring-slate-900', on); b.classList.toggle('border-slate-200', !on); });
+  const set = (id, v) => { const e = document.getElementById(id); if (e && e.value !== v) e.value = v; }; set('supSt', supF.st); set('supIs', supF.is); set('supYr', supF.yr);
+  const th = document.getElementById('supSortIco'); if (th) th.innerHTML = ico(supF.sort === 'asc' ? 'sortup' : 'sortdown', 'h-4 w-4');
 }
 // ---- supplier export / import (CSV) --------------------------------------------------------------
 const SUP_COLS = ['name', 'country', 'address', 'city', 'postal_code', 'website', 'notes', 'active', 'contact_name', 'contact_email'];
@@ -632,41 +666,53 @@ async function runSupplierImport() {
 }
 async function renderSuppliers() {
   loading();
-  const [sr, cr, ir, pr] = await Promise.all([sb.from('v_supplier_status').select('*').order('name'), sb.from('party_contacts').select('party_id,name,email').eq('is_active', true).order('created_at', { ascending: false }), sb.from('parties').select('id,name,country,notes').contains('roles', ['supplier']).eq('is_active', false).order('name'), FEAT.screening ? sb.from('v_party_status').select('party_id,open_hits,confirmed_hits,last_screened_at') : Promise.resolve({ data: [] })]);
+  const [sr, cr, ir, pr, dr] = await Promise.all([sb.from('v_supplier_status').select('*').order('name'), sb.from('party_contacts').select('party_id,name,email').eq('is_active', true).order('created_at', { ascending: false }), sb.from('parties').select('id,name,country,notes').contains('roles', ['supplier']).eq('is_active', false).order('name'), FEAT.screening ? sb.from('v_party_status').select('party_id,open_hits,confirmed_hits,last_screened_at') : Promise.resolve({ data: [] }), fetchAll((a, b) => sb.from('cmrt_declarations').select('party_id,reporting_year').is('archived_at', null).range(a, b)).catch(() => [])]);
   const { data, error } = sr; if (error || cr.error) return fail(error || cr.error);
-  const inactive = ir.data || [];
-  const scr = new Map(((pr && pr.data) || []).map((x) => [x.party_id, x])), scrBadge = (id) => { const x = scr.get(id); return !x ? badge('Not screened', 'gray') : x.confirmed_hits > 0 ? badge('Confirmed match', 'red') : x.open_hits > 0 ? badge(x.open_hits + ' to review', 'amber') : x.last_screened_at ? badge('Clear', 'green') : badge('Not screened', 'gray'); };
+  const inactive = ir.data || [], scr = new Map(((pr && pr.data) || []).map((x) => [x.party_id, x]));
   const confirmed = data.filter((s) => (scr.get(s.party_id) || {}).confirmed_hits > 0).length;
-  // exception flags per supplier, used by the filter chips (a supplier can be in several)
-  const exOf = (s) => { const x = scr.get(s.party_id) || {}, e = [];
-    if (!s.cmrt_status || s.cmrt_expired || s.cmrt_status === 'received' || s.cmrt_status === 'accepted_with_gaps') e.push('cm');
-    if (s.flagged_smelters > 0) e.push('sm');
-    if (FEAT.screening && (x.confirmed_hits > 0 || x.open_hits > 0 || !x.last_screened_at)) e.push('sc');
-    if (s.open_requests > 0) e.push('rq');
-    return e; };
-  const exCount = { cm: 0, sm: 0, sc: 0, rq: 0 }; for (const s of data) for (const k of exOf(s)) exCount[k]++;
-  const EXN = [['', 'All', data.length], ['cm', 'Conflict minerals form', exCount.cm], ['sm', 'Smelter flags', exCount.sm], ...(FEAT.screening ? [['sc', 'Screening', exCount.sc]] : []), ['rq', 'Open requests', exCount.rq]];
-  const supFilterBar = `<div class="flex flex-wrap items-center gap-2 mb-3"><input id="supQ" value="${esc(supF.q)}" placeholder="Search suppliers" class="rounded-lg border border-slate-300 p-2 text-sm w-56">${EXN.map(([k, l, c]) => `<button type="button" data-a="supEx" data-k="${k}" aria-pressed="${supF.ex === k}" class="supChip inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm ${supF.ex === k ? 'border-slate-900 ring-2 ring-slate-900 bg-slate-50' : 'border-slate-200 bg-white hover:border-slate-400'}">${l}<span class="rounded-full ${k && c ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-600'} px-2 text-xs font-semibold">${c}</span></button>`).join('')}<span id="supCount" class="ml-auto text-xs text-slate-500"></span></div>`;
   const contactOf = new Map(); for (const c of cr.data) if (!contactOf.has(c.party_id)) contactOf.set(c.party_id, c);
-  const cmrt = (s) => !s.cmrt_status ? badge('No CMRT', 'red') : s.cmrt_expired ? badge('Expired', 'red') : s.cmrt_status === 'received' ? badge('Awaiting review', 'amber') : s.cmrt_status === 'accepted_with_gaps' ? badge('Accepted with gaps', 'amber') : badge('Current', 'green');
-  shell(`<div class="flex items-center justify-between mb-4"><h2 class="text-xl font-semibold">Suppliers</h2><div class="flex flex-wrap gap-2">${FEAT.screening ? btn('Screen all parties', 'screenAllBtn', {}, 'ghost') : ''}${btn('+ Add supplier', 'addSupplier')}${btn('Import', 'supImport', {}, 'ghost')}${btn('Export', 'supExport', {}, 'ghost')}</div></div>
-  <p class="text-sm text-slate-500 mb-4">Everyone we buy from. Expected for each supplier: a contact, a current conflict minerals form (CMRT) with no flagged smelters, no overdue requests${FEAT.screening ? ' and a clear restricted party screening' : ''}. Use the filters to see only the exceptions.</p>
-  ${supFilterBar}
-  ${confirmed ? `<div class="mb-4 rounded-xl bg-red-50 border border-red-200 p-4 text-sm text-red-700"><b>${confirmed} supplier${confirmed > 1 ? 's have' : ' has'} a confirmed match.</b> Confirmed matches need escalation outside this tool (counsel, and no shipments or payments until decided).</div>` : ''}
-  <div class="rounded-xl bg-white border border-slate-200 overflow-x-auto"><table class="w-full text-sm">
-    <thead class="text-left text-slate-500 border-b border-slate-200"><tr><th class="p-3">Supplier</th><th class="p-3">Contact</th><th class="p-3">Conflict minerals</th><th class="p-3">Valid until</th><th class="p-3">Smelter flags</th>${FEAT.screening ? '<th class="p-3">Screening</th>' : ''}<th class="p-3">Open requests</th><th class="p-3">Cases</th><th class="p-3"></th></tr></thead>
-    <tbody id="supBody" class="divide-y divide-slate-100">${data.map((s) => `<tr data-ex="${exOf(s).join(' ')}" data-q="${esc((s.name + ' ' + (s.country || '')).toLowerCase())}">
-      <td class="p-3 font-medium"><button data-a="openSupplier" data-id="${esc(s.party_id)}" class="text-left font-medium hover:underline">${esc(s.name)}</button><div class="text-xs text-slate-400">${esc(s.country || '')}${FEAT.trade ? ` · ${s.active_skus} active products (SKUs)` : ''}</div></td>
-      <td class="p-3">${contactOf.has(s.party_id) ? `${esc(contactOf.get(s.party_id).name)}<div class="text-xs text-slate-400">${esc(contactOf.get(s.party_id).email || '')}</div>` : '<span class="text-slate-400">None yet</span>'}</td>
-      <td class="p-3">${cmrt(s)}</td><td class="p-3">${fmt(s.valid_until)}</td>
-      <td class="p-3">${s.flagged_smelters > 0 ? badge(s.flagged_smelters + ' flagged', 'red') : badge('None', 'green')}</td>
-      ${FEAT.screening ? `<td class="p-3">${scrBadge(s.party_id)}</td>` : ''}<td class="p-3">${s.open_requests}</td><td class="p-3">${s.open_cases}</td>
-      <td class="p-3 text-right whitespace-nowrap">${btn('Edit', 'editSupplier', { id: s.party_id }, 'ghost')} ${btn('Request documents', 'reqDocs', { id: s.party_id, name: s.name })}</td></tr>`).join('') || '<tr><td class="p-8 text-center text-slate-500" colspan="8">No suppliers yet.</td></tr>'}
-    </tbody></table></div>
-  ${inactive.length ? `<details class="mt-4 rounded-xl bg-white border border-slate-200 p-3"><summary class="text-sm font-medium cursor-pointer">Inactive suppliers (${inactive.length})</summary>
-    <table class="w-full text-sm mt-2"><tbody class="divide-y divide-slate-100">${inactive.map((i) => `<tr class="text-slate-500"><td class="p-2 font-medium">${esc(i.name)}<div class="text-xs text-slate-400">${esc(i.country || '')}${i.notes ? ' · ' + esc(String(i.notes).split('\n').pop()) : ''}</div></td><td class="p-2 text-right whitespace-nowrap">${btn('Edit', 'editSupplier', { id: i.id }, 'ghost')} ${btn('Reactivate', 'supplierActive', { id: i.id, on: '1' }, 'ghost')}</td></tr>`).join('')}</tbody></table></details>` : ''}`);
-  $('#supQ').oninput = (e) => { supF.q = e.target.value; applySupFilter(); };
-  applySupFilter();
+  const yearsOf = new Map(); for (const d of dr || []) if (d.reporting_year) { const a = yearsOf.get(d.party_id) || []; a.push(String(d.reporting_year)); yearsOf.set(d.party_id, a); }
+  supRows = data.map((s) => {
+    const x = scr.get(s.party_id) || {}, hit = x.confirmed_hits > 0 || x.open_hits > 0, is = [];
+    if (!s.cmrt_status) is.push('missing'); else if (s.cmrt_expired) is.push('expired'); else if (s.cmrt_status === 'received') is.push('review'); else if (s.cmrt_status === 'accepted_with_gaps') is.push('gaps');
+    if (s.flagged_smelters > 0) is.push('smelter');
+    if (FEAT.screening && hit) is.push('match');
+    if (s.open_requests > 0) is.push('request');
+    if (FEAT.screening && !hit && !x.last_screened_at) is.push('unscreened');
+    const st = is.some((k) => SUP_ACT.includes(k)) ? 'act' : is.length ? 'prog' : 'ok', id = s.party_id;
+    const next = is.includes('match') ? ['Review matches', 'goParty', { id, tab: 'screening' }] : is.includes('smelter') ? ['Review', 'goParty', { id, tab: 'smelters' }] : is.includes('review') ? ['Review', 'goParty', { id, tab: 'docs' }]
+      : is.includes('missing') || is.includes('expired') ? ['Request CMRT', 'reqDocs', { id, name: s.name }] : is.includes('request') ? ['View request', 'goParty', { id, tab: 'docs' }] : is.includes('unscreened') ? ['Screen now', 'screenNow', { id }] : ['View details', 'openSupplier', { id }];
+    const c = contactOf.get(id);
+    return { s, is, st, next, contact: c ? c.name : '', years: yearsOf.get(id) || [], q: (s.name + ' ' + (s.country || '') + ' ' + (c ? c.name : '')).toLowerCase() };
+  });
+  const cnt = (f) => supRows.filter(f).length, total = supRows.length, pctOf = (n) => (total ? Math.round(n / total * 100) : 0) + '%';
+  const nOk = cnt((x) => x.st === 'ok'), nMiss = cnt((x) => x.is.includes('missing')), nSm = cnt((x) => x.is.includes('smelter')), nRq = cnt((x) => x.is.includes('request'));
+  const card = 'rounded-2xl bg-white border border-slate-200 shadow-sm';
+  const kpi = (k, icon, tone, label, n, extra) => `<button type="button" data-a="supCard" data-k="${k}" class="supChip ${card} flex items-center gap-4 px-5 py-4 text-left hover:border-slate-400"><span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${tone}">${ico(icon, 'h-6 w-6')}</span><span class="min-w-0"><span class="block font-semibold text-slate-900">${label}</span><span class="block text-3xl font-bold leading-tight text-slate-900">${n}${extra ? ` <span class="text-base font-normal text-slate-600">(${extra})</span>` : ''}</span></span></button>`;
+  const selCls = 'w-full appearance-none rounded-lg border border-slate-200 bg-white py-1.5 pl-3 pr-8 text-sm text-slate-900 shadow-sm';
+  const chev = `<span class="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-700">${ico('chevd')}</span>`;
+  const sel = (id, label, opts, cur, cls) => `<div class="min-w-0 flex-1 basis-36 ${cls}"><div class="mb-1 text-sm font-semibold text-slate-800">${label}</div><label class="relative block"><select id="${id}" aria-label="${label}" class="${selCls}">${opts.map(([v, l]) => `<option value="${esc(v)}" ${v === cur ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>${chev}</label></div>`;
+  const issueKeys = Object.keys(SUP_ISSUES).filter((k) => supRows.some((x) => x.is.includes(k))), years = [...new Set(supRows.flatMap((x) => x.years))].sort().reverse();
+  shell(`<div class="flex flex-col gap-4"><div class="flex flex-wrap items-end justify-between gap-x-6 gap-y-3"><div><h1 class="text-3xl font-bold tracking-tight text-slate-900">Suppliers</h1>
+    <p class="max-w-3xl text-slate-600">Manage supplier compliance status, CMRT submissions and issue resolution. Click a card to see only those suppliers.</p></div>
+    <div class="flex flex-wrap items-center gap-2">${btn('Import suppliers', 'supImport', {}, 'ghost')}${btn('+ Add supplier', 'addSupplier')}<button id="supMoreBtn" data-a="supMore" aria-haspopup="true" aria-label="More: export and screening" title="More" class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-100">${ico('dots', 'h-5 w-5')}</button></div></div>
+  <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">${kpi('', 'users', 'bg-slate-100 text-slate-600', 'Total suppliers', total)}${kpi('ok', 'check', 'bg-emerald-50 text-emerald-600', 'Compliant', nOk, pctOf(nOk))}${kpi('missing', 'filecheck', 'bg-red-50 text-red-500', 'Missing CMRT', nMiss, pctOf(nMiss))}${kpi('smelter', 'shield', 'bg-amber-50 text-amber-500', 'Smelter reviews', nSm)}${kpi('request', 'send', 'bg-blue-50 text-blue-500', 'Open requests', nRq)}</div>
+  ${confirmed ? `<div class="rounded-xl bg-red-50 border border-red-200 p-4 text-sm text-red-700"><b>${confirmed} supplier${confirmed > 1 ? 's have' : ' has'} a confirmed match.</b> Confirmed matches need escalation outside this tool (counsel, and no shipments or payments until decided).</div>` : ''}
+  <div class="flex flex-wrap items-end gap-x-3 gap-y-3 md:flex-nowrap">
+    <div class="min-w-0 flex-[2] basis-48"><div class="mb-1 text-sm font-semibold text-slate-800">Search</div><label class="relative block"><span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-600">${ico('search', 'h-5 w-5')}</span><input id="supQ" type="search" value="${esc(supF.q)}" placeholder="Search suppliers..." class="w-full rounded-lg border border-slate-200 bg-white py-1.5 pl-10 pr-3 text-sm shadow-sm"></label></div>
+    ${sel('supSt', 'Compliance status', [['', 'All statuses'], ['act', 'Action needed'], ['prog', 'In progress'], ['ok', 'Compliant']], supF.st, 'md:max-w-[13rem]')}
+    ${sel('supIs', 'Issue type', [['', 'All issue types'], ...issueKeys.map((k) => [k, SUP_ISSUES[k][0]])], supF.is, 'md:max-w-[13rem]')}
+    ${years.length ? sel('supYr', 'CMRT year', [['', 'All years'], ...years.map((y) => [y, y])], supF.yr, 'md:max-w-[9rem]') : ''}
+    <button data-a="supClear" class="shrink-0 pb-2 text-sm font-medium text-slate-600 hover:text-slate-900 hover:underline">Clear filters</button></div>
+  <div class="${card} overflow-x-auto"><table class="w-full text-sm">
+    <thead class="bg-slate-50 text-left text-xs font-semibold text-slate-600 border-b border-slate-200"><tr><th class="p-3"><button data-a="supSort" class="inline-flex items-center gap-1 font-semibold hover:text-slate-900">Supplier <span id="supSortIco"></span></button></th><th class="p-3">Compliance status</th><th class="p-3 text-center">Open issues</th><th class="p-3">Issue types</th><th class="p-3">CMRT valid until</th><th class="p-3"><span class="sr-only">Next action</span></th></tr></thead>
+    <tbody id="supBody" class="divide-y divide-slate-100"></tbody></table></div>
+  <div class="flex flex-wrap items-center justify-between gap-3"><span id="supCount" class="text-sm text-slate-600"></span><div id="supPager" class="flex items-center gap-1.5"></div></div>
+  ${inactive.length ? `<details class="rounded-xl bg-white border border-slate-200 p-3"><summary class="text-sm font-medium cursor-pointer">Inactive suppliers (${inactive.length})</summary>
+    <table class="w-full text-sm mt-2"><tbody class="divide-y divide-slate-100">${inactive.map((i) => `<tr class="text-slate-500"><td class="p-2 font-medium">${esc(i.name)}<div class="text-xs text-slate-400">${esc(i.country || '')}${i.notes ? ' · ' + esc(String(i.notes).split('\n').pop()) : ''}</div></td><td class="p-2 text-right whitespace-nowrap">${btn('Edit', 'editSupplier', { id: i.id }, 'ghost')} ${btn('Reactivate', 'supplierActive', { id: i.id, on: '1' }, 'ghost')}</td></tr>`).join('')}</tbody></table></details>` : ''}</div>`);
+  $('#supQ').oninput = (e) => { supF.q = e.target.value; supF.page = 1; paintSup(); };
+  for (const [id, key] of [['supSt', 'st'], ['supIs', 'is'], ['supYr', 'yr']]) { const el = document.getElementById(id); if (el) el.onchange = (e) => { supF[key] = e.target.value; supF.page = 1; paintSup(); }; }
+  paintSup();
 }
 
 
@@ -2267,7 +2313,13 @@ const actions = {
   },
   openSupplier: ({ id }) => { supId = id; supTab = 'overview'; view = 'supplier'; route(); },
   supTab: ({ v }) => { supTab = v; renderSupplier(); },
-  supEx: ({ k }) => { supF.ex = supF.ex === k ? '' : k; applySupFilter(); },
+  supMore: () => popMenu('supmore', '#supMoreBtn', `<button data-a="supGo" data-x="supExport" role="menuitem" class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm hover:bg-slate-100 rounded-t-xl">${ico('download')}Export suppliers (CSV)</button>${FEAT.screening ? `<button data-a="supGo" data-x="screenAllBtn" role="menuitem" class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm hover:bg-slate-100 rounded-b-xl">${ico('shield')}Screen all parties</button>` : ''}`, 224),
+  supRowMenu: ({ id }) => popMenu('suprow' + id, `[data-a="supRowMenu"][data-id="${id}"]`, `<button data-a="supGo" data-x="openSupplier" data-id="${esc(id)}" role="menuitem" class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm hover:bg-slate-100 rounded-t-xl">${ico('eye')}Open supplier</button><button data-a="supGo" data-x="editSupplier" data-id="${esc(id)}" role="menuitem" class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm hover:bg-slate-100 rounded-b-xl">${ico('pencil')}Edit</button>`, 192),
+  supGo: ({ x, id }) => { closeNavMenu(); if (['openSupplier', 'editSupplier', 'supImport', 'supExport', 'screenAllBtn'].includes(x)) actions[x]({ id }); },
+  supCard: ({ k }) => { const on = k === 'ok' ? supF.st === 'ok' && !supF.is : k ? supF.is === k && !supF.st : false; supF.st = ''; supF.is = ''; if (k && !on) { if (k === 'ok') supF.st = 'ok'; else supF.is = k; } supF.page = 1; paintSup(); },
+  supClear: () => { supF = { ...supF, q: '', st: '', is: '', yr: '', page: 1 }; const q = document.getElementById('supQ'); if (q) q.value = ''; paintSup(); },
+  supSort: () => { supF.sort = supF.sort === 'asc' ? 'desc' : 'asc'; paintSup(); },
+  supPage: ({ p }) => { supF.page = Number(p); paintSup(); },
   supExport: () => exportSuppliers().catch((e) => toast(e.message || 'Export failed')),
   supImport: () => {
     supImportRows = null;
@@ -2278,8 +2330,10 @@ const actions = {
     $('#supFile').onchange = (e) => previewSupplierImport(e.target.files[0]);
   },
   supImportGo: () => runSupplierImport(),
-  dashPri: ({ k }) => { dashPri = k; paintDash(); },
-  dashCat: ({ k }) => { dashCat = dashCat === k ? 'all' : k; paintDash(); const el = document.getElementById('dashAttn'); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); },
+  dashPri: ({ k }) => { if (k === 'all') dashPri.clear(); else if (dashPri.has(k)) dashPri.delete(k); else dashPri.add(k); paintDash(); },
+  dashKpi: ({ k }) => { const same = dashCat.size === 1 && dashCat.has(k); dashCat.clear(); if (!same) dashCat.add(k); dashMs = null; paintDash(); const el = document.getElementById('dashAttn'); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); },
+  dashMsOpen: ({ g }) => { dashMs = dashMs === g ? null : g; paintDash(); },
+  dashMs: ({ g, k }) => { const set = g === 'pri' ? dashPri : dashCat; if (!k) set.clear(); else if (set.has(k)) set.delete(k); else set.add(k); paintDash(); },
   dashSort: () => { dashDesc = !dashDesc; paintDash(); },
   dashRefresh: () => renderToday(),
   dashToggle: ({ i }) => { dashOpen.has(i) ? dashOpen.delete(i) : dashOpen.add(i); paintDashList(); closeNavMenu(); },
@@ -2603,11 +2657,11 @@ const actions = {
   copy: async () => { await navigator.clipboard.writeText($('#lkU').value); toast('Copied'); }
 };
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeNavMenu(); });
-document.addEventListener('click', (e) => { if (!e.target.closest('#navmenu') && !e.target.closest('[data-a="menu"],[data-a="bell"],[data-a="userMenu"],[data-a="dashMore"]')) closeNavMenu(); });
+document.addEventListener('click', (e) => { if (dashMs && !e.target.closest('[data-mswrap]')) { dashMs = null; if (view === 'today' && dash) paintDash(); }
+  if (!e.target.closest('#navmenu') && !e.target.closest('[data-a="menu"],[data-a="bell"],[data-a="userMenu"],[data-a="dashMore"],[data-a="supMore"],[data-a="supRowMenu"]')) closeNavMenu(); });
 document.addEventListener('click', (e) => { const b = e.target.closest('[data-a]'); if (b && actions[b.dataset.a]) actions[b.dataset.a](b.dataset); });
 document.addEventListener('change', (e) => { if (e.target.id === 'rqType') { const s = $('#rqSub'); if (s && !s.dataset.t) s.value = `${new Date().getFullYear()} ${actions.rq.types.find((x) => x.code === e.target.value)?.name || ''}`; } });
 document.addEventListener('input', (e) => { if (e.target.id === 'rqSub') e.target.dataset.t = '1'; if (e.target.id === 'dashQ') { dashQ = e.target.value; paintDashList(); } });
-document.addEventListener('change', (e) => { if (e.target.id === 'dashCat') { dashCat = e.target.value; paintDash(); } if (e.target.id === 'dashPriSel') { dashPri = e.target.value; paintDash(); } });
 document.addEventListener('change', (e) => {
   if (e.target.id === 'ofGov') { const b = $('#ofGovBox'); if (b) b.classList.toggle('hidden', !e.target.checked); }
   if (e.target.dataset && e.target.dataset.rule) sb.from('order_check_rules').update({ level: e.target.value, updated_at: new Date().toISOString() }).eq('item', e.target.dataset.rule).then((r) => toast(r.error ? r.error.message : 'Saved'));
