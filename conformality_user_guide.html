@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="1.21.0">
+<meta name="version" content="1.21.1">
 <title>Conformality User Guide</title>
 <link rel="icon" href="./favicon.svg" type="image/svg+xml">
 <link rel="icon" href="./favicon.ico" sizes="48x48">
@@ -80,7 +80,7 @@
 
 <main>
 <h1>Conformality User Guide</h1>
-<p style="color:var(--muted);font-size:.9rem;margin:0 0 12px">Guide version 1.21.0 · Updated 12 Nov 2026 · Applies to app version 1.21.0 (shown next to the name in the app's top bar) · <a href="./index.html" style="color:inherit">Open the app</a></p>
+<p style="color:var(--muted);font-size:.9rem;margin:0 0 12px">Guide version 1.21.1 · Updated 12 Nov 2026 · Applies to app version 1.21.1 (shown next to the name in the app's top bar) · <a href="./index.html" style="color:inherit">Open the app</a></p>
 <p class="lead">Conformality is our in-house tool for proving that we know who our suppliers and customers are, what we sell, and where it goes. It collects evidence, flags problems, records who decided what, and keeps the history so it can be shown to an auditor or customer.</p>
 
 <div class="warn"><b>Important.</b> This tool organizes work and records decisions. It does not give legal advice and it does not decide whether an export licence is required. When a result is unclear, or a match is confirmed, involve your compliance lead or legal counsel.</div>
@@ -354,10 +354,10 @@
 <div class="example"><b class="l">Example (made-up names)</b>A customer's auditor asks: "Who approved the classification for XYZ-2, and when?" You search the Audit log for that item and see the person, the date and what changed. Entries cannot be edited or deleted, and each is linked to the one before it, so any tampering would show.</div>
 <ul>
   <li>Five cards at the top count the events in the chosen period: <b>Total events</b>, <b>User actions</b> (done by a signed-in person), <b>Imports</b>, <b>Data updates</b> and <b>Security &amp; access</b>, each with its share of the total. Click a card to see only those events; click Total events to see everything.</li>
-  <li>One row of filters: <b>Search</b>, <b>Event type</b>, <b>Object</b> and <b>User</b> (each is a multi-select with an icon on every option and a count), and <b>Date range</b> (last 7, 30 or 90 days, last 12 months, all time, or a custom From and To). <b>Clear filters</b> resets the search and the drop-downs.</li>
+  <li>One row of filters: <b>Search</b> (user, object or record ID; it does not search inside the description text), <b>Event type</b>, <b>Object</b> and <b>User</b> (each is a multi-select with an icon on every option and a count), and <b>Date range</b> (last 7, 30 or 90 days, last 12 months, all time, or a custom From and To). <b>Clear filters</b> resets the search and the drop-downs.</li>
   <li>The table shows date and time (click the heading to flip the order), the user, an event-type pill, the object, and a one-line description. Event types are <span class="b g">Create</span>, <span class="b">Import</span>, <span class="b">Update</span>, <span class="b">Request</span>, <span class="b g">Resolve</span>, <span class="b">Access</span> (private-link visits and user-account changes) and <span class="b r">Delete</span>. The type is worked out from what was recorded, so a few entries may land in a broader type than you expect.</li>
   <li>The <b>...</b> menu on a row opens <span class="btn">Details</span> (before and after values, entry number and hashes) or limits the table to that user.</li>
-  <li>The table shows 10 events per page, with page numbers underneath. The screen loads up to the 3,000 most recent events in the period and tells you when there are more; narrow the date range or export for the rest.</li>
+  <li>The table shows <b>50 events per page</b>, loaded one page at a time so the page opens quickly however large the log grows. Under the table, <b>First</b> and <b>Previous</b> buttons, page numbers with <b>...</b> before the last page (for example 1 2 3 4 5 ... 298), and <b>Next</b> and <b>Last</b> buttons. The line at the left says which events you are seeing and how many match in all.</li>
   <li>The badge at the top (<span class="b g">Integrity verified</span>) means the chain of entries checks out. <span class="b r">Integrity problem</span> means an entry was altered or removed, so tell your admin immediately.</li>
   <li><span class="btn">Export CSV</span> for the full set and <span class="btn">Print / save as PDF</span> for a formatted report; both follow your current filters.</li>
   <li>Entries cannot be edited or deleted by anyone through the app.</li>
@@ -623,6 +623,7 @@ MLN-1234,EAR,7A994,9031.80.8085,US,supplier_stated,Per supplier classification l
 <h2 id="versions">Version history</h2>
 <table>
   <tr><th style="width:14%">Version</th><th style="width:16%">Date</th><th>Change</th></tr>
+  <tr><td>1.21.1</td><td>12 Nov 2026</td><td>Applies to app 1.21.1. Audit log: 50 events a page, loaded one page at a time, with first, previous, page numbers, ..., last, next and end buttons. Filters, search and sorting now run in the database.</td></tr>
   <tr><td>1.21.0</td><td>12 Nov 2026</td><td>Applies to app 1.21.0. The Audit log is redesigned: cards (total, user actions, imports, data updates, security &amp; access), one row of filters (search, event type, object, user, date range), event-type pills, paged table with a row menu.</td></tr>
   <tr><td>1.20.1</td><td>12 Nov 2026</td><td>Applies to app 1.20.1. On Regulatory data the tabs are replaced by a multi-select Source drop-down (Government lists, Reference data) in the same row as Search and Status.</td></tr>
   <tr><td>1.20.0</td><td>12 Nov 2026</td><td>Applies to app 1.20.0. The Regulatory data page is redesigned: cards (Data sources, Up to date, Update due, Action needed, About), tabs (All sources, Government lists, Reference data), search with a multi-select Status filter, and a table with description, last and next update, status and an action button on each row.</td></tr>
@@ -673,7 +674,7 @@ MLN-1234,EAR,7A994,9031.80.8085,US,supplier_stated,Per supplier classification l
   <tr><td>1.1.0</td><td>22 Oct 2026</td><td>Adds end user statements (online signing or upload), the order file (checklist, licence determination, government-contract flags, download), shipment-check levels and the Rules tab (renamed from Destinations), new document types, and database part 10. Documents the starting assumptions.</td></tr>
   <tr><td>1.0.0</td><td>16 Oct 2026</td><td>First versioned release. Covers the app through the trade compliance and screening speed updates (database parts 1–9). The app, portal and this guide are versioned separately; each increases with every revision.</td></tr>
 </table>
-<p style="color:var(--muted);font-size:.9rem;margin-top:24px">Conformality user guide v1.21.0</p>
+<p style="color:var(--muted);font-size:.9rem;margin-top:24px">Conformality user guide v1.21.1</p>
 </main>
 </div>
 </body>
