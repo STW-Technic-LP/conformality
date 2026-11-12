@@ -45,6 +45,7 @@ main div:has(>table){overflow-x:auto}
 // ---- VERSION: increase with every revision (also update the user guide's "applies to") ----
 // 1.11.0 Records shows just "Audit log" when trade compliance is off. Suppliers: Import and Export (CSV) and exception filters. Every page opens with a line saying what is expected.
 //        Every dialog has an X in its corner. Government data: the "Where to update each one" section is gone; Load list is a button on the table row.
+// 1.14.1 Dashboard: page title is "Dashboard"; Priority and Issue type filters share one row (chips on wide screens, drop-down lists on small ones); search sits on the row below.
 // 1.14.0 Dashboard redesign: KPI cards (compliance ring, missing CMRT, smelter reviews, open requests), severity bar, and one filterable Requires attention list (priority, issue type, search, expandable rows). CMRT check and By area tiles are folded into it.
 // 1.13.0 Configuration moves out of the tab strip into a wrench (Settings) icon left of the bell and user icon; same drop-down, count pill on the icon.
 // 1.12.1 Account menu: Change password (current password checked first, then updateUser).
@@ -92,7 +93,7 @@ main div:has(>table){overflow-x:auto}
 //        government-contract flags (FAR Part 12 / TAA / BAA), shipment-check levels (Trade > Rules), order file download.
 //        Fixed: date-only values no longer show a day early in US time zones.
 // 1.0.0  First versioned release. Added the user guide link.
-const APP_VERSION = '1.14.0';
+const APP_VERSION = '1.14.1';
 // ---- CONFIG: paste your Supabase project values -------------------------------
 const CFG = {
   url: 'https://sjwarllnehssyphoormc.supabase.co',                    // https://xxxx.supabase.co
@@ -411,12 +412,13 @@ function paintDash() {
   const chip = (on, act, data, inner) => `<button data-a="${act}" ${data} aria-pressed="${on}" class="inline-flex items-center gap-2 rounded-full border bg-white px-3 py-1.5 text-sm font-medium text-slate-900 shadow-sm ${on ? 'border-slate-900 ring-1 ring-slate-900' : 'border-slate-200 hover:border-slate-400'}">${inner}</button>`;
   const num = (n, t) => `<span class="rounded-full px-2 py-0.5 text-xs font-semibold ${t}">${n}</span>`;
   const catChip = (k) => `<button data-a="dashCat" data-k="${k}" aria-pressed="${dashCat === k}" class="inline-flex items-center gap-1.5 rounded-lg border bg-white px-2.5 py-1.5 text-sm text-slate-900 shadow-sm ${dashCat === k ? 'border-slate-900 ring-1 ring-slate-900' : 'border-slate-200 hover:border-slate-400'}"><span class="text-slate-700">${ico(CATS[k][1], 'h-4 w-4')}</span>${CATS[k][0]}${num(nCat[k], 'bg-amber-100 text-amber-800')}</button>`;
+  const selCls = 'w-full appearance-none rounded-lg border border-slate-200 bg-white py-1.5 pl-3 pr-8 text-sm text-slate-900 shadow-sm';
   const catKeys = Object.keys(CATS).filter((k) => nCat[k]);
   const nMiss = items.filter((x) => x.kind === 'missing_cmrt').length;
   const upd = new Date(dash.at).toLocaleString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
   shell(`
     <div class="flex flex-col gap-4">
-      <div class="flex flex-wrap items-end justify-between gap-x-6 gap-y-2"><div><h1 class="text-3xl font-bold tracking-tight text-slate-900">Compliance dashboard</h1><p class="text-slate-600">Monitor compliance gaps, review flagged smelters, and manage outstanding requests.</p></div>
+      <div class="flex flex-wrap items-end justify-between gap-x-6 gap-y-2"><div><h1 class="text-3xl font-bold tracking-tight text-slate-900">Dashboard</h1><p class="text-slate-600">Monitor compliance gaps, review flagged smelters, and manage outstanding requests.</p></div>
         <button data-a="dashRefresh" title="Reload the dashboard" class="inline-flex items-center gap-2 rounded-lg px-2 py-1 text-sm text-slate-600 hover:bg-slate-200">${ico('refresh', 'h-5 w-5')}Last updated: ${esc(upd)}</button></div>
       <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <div class="${card} flex items-center gap-4 px-5 py-4">${ring}<div class="min-w-0"><div class="flex items-center gap-2 text-lg font-semibold text-slate-900">Compliance <span title="Suppliers with an accepted, unexpired CMRT and no flagged smelters." class="text-slate-500">${ico('info', 'h-5 w-5')}</span></div><div class="text-slate-600">${sup ? `${okN} of ${sup.length} suppliers compliant` : 'Not available'}</div></div></div>
@@ -432,14 +434,16 @@ function paintDash() {
       <section id="dashAttn" class="${card} p-5">
         <div class="flex flex-wrap items-center justify-between gap-4"><div class="flex items-center gap-4"><span class="flex h-12 w-12 items-center justify-center rounded-xl bg-red-50 text-red-600">${ico('alert', 'h-7 w-7')}</span><div><h2 class="text-2xl font-bold tracking-tight text-slate-900">Requires attention</h2><p class="text-slate-600">${total ? `Review and address the ${total} open compliance item${total > 1 ? 's' : ''}.` : 'Nothing is open.'}</p></div></div>
           ${nMiss ? `<button data-a="dashReqAll" class="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-5 py-3 font-semibold text-white hover:bg-slate-700">${ico('send', 'h-5 w-5')}Request missing CMRTs (${nMiss})</button>` : ''}</div>
-        <div class="mt-4 flex flex-wrap items-end gap-x-4 gap-y-3">
-          <div><div class="mb-1 text-sm font-semibold text-slate-800">Priority</div><div class="flex flex-wrap gap-2">
-            ${chip(dashPri === 'all', 'dashPri', 'data-k="all"', `All ${num(total, 'bg-slate-100 text-slate-700')}`)}${['high', 'medium', 'low'].map((s) => chip(dashPri === s, 'dashPri', `data-k="${s}"`, `${SEV[s]} ${num(sev[s], s === 'high' ? 'bg-red-100 text-red-700' : s === 'medium' ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-700')}`)).join('')}</div></div>
-          <div class="min-w-0"><div class="mb-1 text-sm font-semibold text-slate-800">Issue type</div><div class="flex flex-wrap items-center gap-2">
-            <label class="relative"><select id="dashCat" aria-label="Issue type" class="appearance-none rounded-lg border border-slate-200 bg-white py-1.5 pl-3 pr-8 text-sm text-slate-900 shadow-sm"><option value="all">All categories</option>${catKeys.map((k) => `<option value="${k}" ${dashCat === k ? 'selected' : ''}>${CATS[k][0]} (${nCat[k]})</option>`).join('')}</select><span class="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-700">${ico('chevd')}</span></label>
-            ${catKeys.slice(0, 4).map(catChip).join('')}
-            <label class="relative"><span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-600">${ico('search', 'h-5 w-5')}</span><input id="dashQ" type="search" value="${esc(dashQ)}" placeholder="Search issues..." class="w-44 rounded-lg border border-slate-200 bg-white py-1.5 pl-10 pr-3 text-sm shadow-sm"></label></div></div>
+        <div class="mt-4 flex flex-wrap items-end gap-x-4 gap-y-3 2xl:flex-nowrap">
+          <div class="min-w-0 flex-1 basis-40 2xl:flex-none"><div class="mb-1 text-sm font-semibold text-slate-800">Priority</div>
+            <div class="hidden gap-2 2xl:flex">${chip(dashPri === 'all', 'dashPri', 'data-k="all"', `All ${num(total, 'bg-slate-100 text-slate-700')}`)}${['high', 'medium', 'low'].map((s) => chip(dashPri === s, 'dashPri', `data-k="${s}"`, `${SEV[s]} ${num(sev[s], s === 'high' ? 'bg-red-100 text-red-700' : s === 'medium' ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-700')}`)).join('')}</div>
+            <label class="relative block 2xl:hidden"><select id="dashPriSel" aria-label="Priority" class="${selCls}"><option value="all" ${dashPri === 'all' ? 'selected' : ''}>All (${total})</option>${['high', 'medium', 'low'].map((s) => `<option value="${s}" ${dashPri === s ? 'selected' : ''}>${SEV[s]} (${sev[s]})</option>`).join('')}</select><span class="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-700">${ico('chevd')}</span></label></div>
+          <div class="hidden h-9 w-px bg-slate-200 2xl:block"></div>
+          <div class="min-w-0 flex-1 basis-40 2xl:flex-auto"><div class="mb-1 text-sm font-semibold text-slate-800">Issue type</div><div class="flex items-center gap-2">
+            <label class="relative block w-full 2xl:w-auto"><select id="dashCat" aria-label="Issue type" class="${selCls}"><option value="all">All categories</option>${catKeys.map((k) => `<option value="${k}" ${dashCat === k ? 'selected' : ''}>${CATS[k][0]} (${nCat[k]})</option>`).join('')}</select><span class="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-700">${ico('chevd')}</span></label>
+            <div class="hidden gap-2 2xl:flex">${catKeys.slice(0, 4).map(catChip).join('')}</div></div></div>
         </div>
+        <label class="relative mt-3 block sm:max-w-sm"><span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-600">${ico('search', 'h-5 w-5')}</span><input id="dashQ" type="search" value="${esc(dashQ)}" placeholder="Search issues..." class="w-full rounded-lg border border-slate-200 bg-white py-1.5 pl-10 pr-3 text-sm shadow-sm"></label>
         <div id="dashList" class="mt-4">${dashListHtml()}</div>
       </section>
     </div>`);
@@ -2544,7 +2548,7 @@ document.addEventListener('click', (e) => { if (!e.target.closest('#navmenu') &&
 document.addEventListener('click', (e) => { const b = e.target.closest('[data-a]'); if (b && actions[b.dataset.a]) actions[b.dataset.a](b.dataset); });
 document.addEventListener('change', (e) => { if (e.target.id === 'rqType') { const s = $('#rqSub'); if (s && !s.dataset.t) s.value = `${new Date().getFullYear()} ${actions.rq.types.find((x) => x.code === e.target.value)?.name || ''}`; } });
 document.addEventListener('input', (e) => { if (e.target.id === 'rqSub') e.target.dataset.t = '1'; if (e.target.id === 'dashQ') { dashQ = e.target.value; paintDashList(); } });
-document.addEventListener('change', (e) => { if (e.target.id === 'dashCat') { dashCat = e.target.value; paintDash(); } });
+document.addEventListener('change', (e) => { if (e.target.id === 'dashCat') { dashCat = e.target.value; paintDash(); } if (e.target.id === 'dashPriSel') { dashPri = e.target.value; paintDash(); } });
 document.addEventListener('change', (e) => {
   if (e.target.id === 'ofGov') { const b = $('#ofGovBox'); if (b) b.classList.toggle('hidden', !e.target.checked); }
   if (e.target.dataset && e.target.dataset.rule) sb.from('order_check_rules').update({ level: e.target.value, updated_at: new Date().toISOString() }).eq('item', e.target.dataset.rule).then((r) => toast(r.error ? r.error.message : 'Saved'));
