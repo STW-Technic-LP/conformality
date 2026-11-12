@@ -49,7 +49,8 @@ main div:has(>table){overflow-x:auto}
 // ---- VERSION: increase with every revision (also update the user guide's "applies to") ----
 // 1.11.0 Records shows just "Audit log" when trade compliance is off. Suppliers: Import and Export (CSV) and exception filters. Every page opens with a line saying what is expected.
 //        Every dialog has an X in its corner. Regulatory data: the "Where to update each one" section is gone; Load list is a button on the table row.
-// 1.20.0 Regulatory data page redesigned: cards (Data sources, Up to date, Update due, Action needed, About), tabs (All sources, Government lists, Reference data), search with a multi-select Status filter, and a table with description, dates, status and an action button per source.
+// 1.20.1 Regulatory data: the tabs are replaced by a multi-select Source drop-down (Government lists, Reference data) beside Status.
+// 1.20.0 Regulatory data page redesigned: cards (Data sources, Up to date, Update due, Action needed, About), search with multi-select Source (Government lists, Reference data) and Status filters, and a table with description, dates, status and an action button per source.
 // 1.19.0 Suppliers filters (Compliance status, Issue type, CMRT year) are multi-select checklists; every option in the Suppliers and Dashboard filter drop-downs has an icon.
 // 1.18.0 Suppliers page follows the new design: cards (Total, Compliant, Missing CMRT, Smelter reviews, Open requests), Compliance status / Issue type / CMRT year filters with Clear filters, a status + open issues + issue types + next action table, sortable by name, with paging.
 // 1.17.0 Suppliers page restyled: heading and subtitle, exception cards (click to filter), search with Conflict minerals and Country drop-downs, rounded table, Import/Export under a ... button and Open/Edit under a ... button on each row.
@@ -106,7 +107,7 @@ main div:has(>table){overflow-x:auto}
 //        government-contract flags (FAR Part 12 / TAA / BAA), shipment-check levels (Trade > Rules), order file download.
 //        Fixed: date-only values no longer show a day early in US time zones.
 // 1.0.0  First versioned release. Added the user guide link.
-const APP_VERSION = '1.20.0';
+const APP_VERSION = '1.20.1';
 // ---- CONFIG: paste your Supabase project values -------------------------------
 const CFG = {
   url: 'https://sjwarllnehssyphoormc.supabase.co',                    // https://xxxx.supabase.co
@@ -516,12 +517,12 @@ async function dataCheckSave({ code }) {
 }
 
 // ---- Regulatory data page ---------------------------------------------------------------------
-let govF = { q: '', st: new Set(), tab: 'all', sort: '' }, govMs = null, govRows = [];   // st holds ok | due | act; tab: all | lists | ref; sort: '' | asc | desc
+let govF = { q: '', st: new Set(), src: new Set(), sort: '' }, govMs = null, govRows = [];   // st holds ok | due | act; src holds lists | ref; sort: '' | asc | desc
 const GOV_ST = { ok: ['Up to date', 'check', 'bg-emerald-100 text-emerald-700', 'text-emerald-600'], due: ['Update due', 'clock', 'bg-amber-100 text-amber-700', 'text-amber-500'], act: ['Action needed', 'alert', 'bg-red-100 text-red-700', 'text-red-500'] };
 const govKey = (r) => !r.last_at ? 'due' : r.status === 'overdue' ? 'act' : r.status === 'due_soon' ? 'due' : 'ok';
 function govFiltered() {
   const q = govF.q.trim().toLowerCase();
-  const r = govRows.filter((x) => (govF.tab === 'all' || (govF.tab === 'lists') === !!x.r.is_auto) && (!govF.st.size || govF.st.has(x.k)) && (!q || (x.r.label + ' ' + (x.r.what || '')).toLowerCase().includes(q)));
+  const r = govRows.filter((x) => (!govF.src.size || govF.src.has(x.r.is_auto ? 'lists' : 'ref')) && (!govF.st.size || govF.st.has(x.k)) && (!q || (x.r.label + ' ' + (x.r.what || '')).toLowerCase().includes(q)));
   if (govF.sort) r.sort((a, b) => a.r.label.localeCompare(b.r.label) * (govF.sort === 'asc' ? 1 : -1));
   return r;
 }
@@ -535,15 +536,15 @@ function govRowHtml({ r, k }) {
     <td class="p-3 text-right whitespace-nowrap">${act}<button data-a="govRowMenu" data-code="${esc(r.code)}" aria-haspopup="true" aria-label="More actions for ${esc(r.label)}" class="ml-1 inline-flex h-8 w-8 items-center justify-center rounded-lg align-middle text-slate-600 hover:bg-slate-100">${ico('dots', 'h-5 w-5')}</button></td></tr>`;
 }
 function govMsHtml() {
-  const cnt = (k) => govRows.filter((x) => x.k === k).length;
-  return msHtml({ g: 'st', act: 'govMsPick', openAct: 'govMsOpen', allLabel: 'All statuses', set: govF.st, open: govMs === 'st', opts: Object.entries(GOV_ST).map(([k, [l, ic, , c]]) => [k, l, cnt(k), ic, c]) });
+  const cnt = (k) => govRows.filter((x) => x.k === k).length, blk = (label, inner, cls) => `<div class="min-w-0 flex-1 basis-36 ${cls}"><div class="mb-1 text-sm font-semibold text-slate-800">${label}</div>${inner}</div>`;
+  return blk('Source', msHtml({ g: 'src', act: 'govMsPick', openAct: 'govMsOpen', allLabel: 'All sources', set: govF.src, open: govMs === 'src', opts: [['lists', 'Government lists', govRows.filter((x) => x.r.is_auto).length, 'upload', 'text-slate-600'], ['ref', 'Reference data', govRows.filter((x) => !x.r.is_auto).length, 'scroll', 'text-slate-600']] }), 'md:max-w-[14rem]')
+    + blk('Status', msHtml({ g: 'st', act: 'govMsPick', openAct: 'govMsOpen', allLabel: 'All statuses', set: govF.st, open: govMs === 'st', opts: Object.entries(GOV_ST).map(([k, [l, ic, , c]]) => [k, l, cnt(k), ic, c]) }), 'md:max-w-[14rem]');
 }
 function paintGov() {
   const list = govFiltered(), body = document.getElementById('govBody'); if (!body) return;
   body.innerHTML = list.map(govRowHtml).join('') || `<tr><td class="p-8 text-center text-slate-500" colspan="7">${govRows.length ? 'No data sources match these filters.' : 'No data sources.'}</td></tr>`;
   const c = document.getElementById('govCount'); if (c) c.textContent = `${list.length} data source${list.length === 1 ? '' : 's'}`;
   const m = document.getElementById('govMs'); if (m) m.innerHTML = govMsHtml();
-  document.querySelectorAll('.govTab').forEach((b) => { const on = b.dataset.t === govF.tab; b.setAttribute('aria-selected', on); b.className = `govTab inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold ${on ? 'bg-slate-900 text-white' : 'border border-slate-200 bg-white text-slate-800 hover:bg-slate-100'}`; });
   document.querySelectorAll('.govChip').forEach((b) => { const k = b.dataset.k, on = k ? govF.st.size === 1 && govF.st.has(k) : false; b.setAttribute('aria-pressed', on); b.classList.toggle('border-slate-900', on); b.classList.toggle('ring-2', on); b.classList.toggle('ring-slate-900', on); b.classList.toggle('border-slate-200', !on); });
   const th = document.getElementById('govSortIco'); if (th) th.innerHTML = govF.sort ? ico(govF.sort === 'asc' ? 'sortup' : 'sortdown', 'h-4 w-4') : '';
   if ($('#rmapFile')) $('#rmapFile').onchange = (e) => { importRmap(e.target.files[0]); e.target.value = ''; };
@@ -562,10 +563,9 @@ async function renderGovData() {
     <button data-a="govRefresh" class="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-100">${ico('refresh', 'h-5 w-5')}Refresh</button></div>
   <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">${kpi('', 'landmark', 'bg-blue-50 text-blue-500', 'Data sources', govRows.length)}${kpi('ok', 'check', 'bg-emerald-50 text-emerald-600', 'Up to date', n('ok'))}${kpi('due', 'clock', 'bg-amber-50 text-amber-500', 'Update due', n('due'))}${kpi('act', 'alert', 'bg-red-50 text-red-500', 'Action needed', n('act'))}
     <div class="rounded-2xl border border-orange-100 bg-orange-50 px-5 py-4 sm:col-span-2 xl:col-span-1"><div class="flex items-center gap-2 font-semibold text-slate-900"><span class="text-red-700">${ico('info', 'h-5 w-5')}</span>About regulatory data</div><p class="mt-1 text-sm text-slate-700">Keep the lists and rules this app depends on up to date: load a downloaded file, or record that you checked a rule or notice.</p></div></div>
-  <div class="flex flex-wrap gap-2 border-b border-slate-200 pb-3" role="tablist"><button data-a="govTab" data-t="all" role="tab" class="govTab">${ico('landmark', 'h-5 w-5')}All sources</button><button data-a="govTab" data-t="lists" role="tab" class="govTab">${ico('upload', 'h-5 w-5')}Government lists (${nLists})</button><button data-a="govTab" data-t="ref" role="tab" class="govTab">${ico('scroll', 'h-5 w-5')}Reference data (${govRows.length - nLists})</button></div>
   <div class="flex flex-wrap items-end gap-x-3 gap-y-3 md:flex-nowrap">
     <div class="min-w-0 flex-[2] basis-48"><div class="mb-1 text-sm font-semibold text-slate-800">Search</div><label class="relative block"><span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-600">${ico('search', 'h-5 w-5')}</span><input id="govQ" type="search" value="${esc(govF.q)}" placeholder="Search data sources..." class="w-full rounded-lg border border-slate-200 bg-white py-1.5 pl-10 pr-3 text-sm shadow-sm"></label></div>
-    <div class="min-w-0 flex-1 basis-36 md:max-w-[14rem]"><div class="mb-1 text-sm font-semibold text-slate-800">Status</div><div id="govMs"></div></div>
+    <div id="govMs" class="contents"></div>
     <button data-a="govClear" class="shrink-0 pb-2 text-sm font-medium text-slate-600 hover:text-slate-900 hover:underline">Clear filters</button><span id="govCount" class="shrink-0 pb-2 text-sm text-slate-600"></span></div>
   <div class="${card} overflow-x-auto"><table class="w-full text-sm"><thead class="bg-slate-50 text-left text-xs font-semibold text-slate-600 border-b border-slate-200"><tr><th class="p-3"><button data-a="govSort" class="inline-flex items-center gap-1 font-semibold hover:text-slate-900">Data source <span id="govSortIco"></span></button></th><th class="p-3">How it is updated</th><th class="p-3">Description</th><th class="p-3">Last updated</th><th class="p-3">Next update</th><th class="p-3">Status</th><th class="p-3"><span class="sr-only">Actions</span></th></tr></thead>
     <tbody id="govBody" class="divide-y divide-slate-100"></tbody></table></div></div>`);
@@ -2374,10 +2374,9 @@ const actions = {
   supGo: ({ x, id }) => { closeNavMenu(); if (['openSupplier', 'editSupplier', 'supImport', 'supExport', 'screenAllBtn'].includes(x)) actions[x]({ id }); },
   govCard: ({ k }) => { const on = k ? govF.st.size === 1 && govF.st.has(k) : false; govF.st.clear(); if (k && !on) govF.st.add(k); govMs = null; paintGov(); },
   govMsOpen: ({ g }) => { govMs = govMs === g ? null : g; paintGov(); },
-  govMsPick: ({ g, k }) => { if (!k) govF.st.clear(); else if (govF.st.has(k)) govF.st.delete(k); else govF.st.add(k); paintGov(); },
-  govTab: ({ t }) => { govF.tab = t; paintGov(); },
+  govMsPick: ({ g, k }) => { const set = g === 'src' ? govF.src : govF.st; if (!k) set.clear(); else if (set.has(k)) set.delete(k); else set.add(k); paintGov(); },
   govSort: () => { govF.sort = govF.sort === 'asc' ? 'desc' : govF.sort === 'desc' ? '' : 'asc'; paintGov(); },
-  govClear: () => { govF.q = ''; govF.st.clear(); govF.tab = 'all'; govMs = null; const q = document.getElementById('govQ'); if (q) q.value = ''; paintGov(); },
+  govClear: () => { govF.q = ''; govF.st.clear(); govF.src.clear(); govMs = null; const q = document.getElementById('govQ'); if (q) q.value = ''; paintGov(); },
   govRefresh: () => { renderGovData(); refreshBell(true); },
   govRowMenu: ({ code }) => { const r = (govRows.find((x) => x.r.code === code) || {}).r || {}; popMenu('gov' + code, `[data-a="govRowMenu"][data-code="${code}"]`, `<button data-a="govGo" data-code="${esc(code)}" role="menuitem" class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm hover:bg-slate-100 ${r.url ? 'rounded-t-xl' : 'rounded-xl'}">${ico('info')}Details${r.is_auto ? '' : ' and record a check'}</button>${r.url ? `<a href="${esc(r.url)}" target="_blank" rel="noopener" role="menuitem" class="flex w-full items-center gap-2 rounded-b-xl px-4 py-2.5 text-left text-sm hover:bg-slate-100">${ico('eye')}Open the source</a>` : ''}`, 224); },
   govGo: ({ code }) => { closeNavMenu(); dataCheckModal(code); },
