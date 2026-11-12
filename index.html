@@ -16,10 +16,14 @@
 <meta name="apple-mobile-web-app-title" content="Conformality">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+<script>
+// Type scale: body text is 13px; every other size keeps its old ratio to the 14px that body text used before (x 13/14).
+tailwind.config = { theme: { extend: { fontSize: { xs: ['11px', '15px'], sm: ['13px', '18px'], base: ['15px', '22px'], lg: ['17px', '25px'], xl: ['19px', '25px'], '2xl': ['22px', '30px'], '3xl': ['28px', '33px'] } } } };
+</script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-<style>body{font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}dialog::backdrop{background:rgba(15,23,42,.5)}#dlgBody h3{padding-right:2rem}#printArea{display:none}
+<style>body{font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;font-size:13px;line-height:1.5}dialog::backdrop{background:rgba(15,23,42,.5)}#dlgBody h3{padding-right:2rem}#printArea{display:none}
 main div:has(>table){overflow-x:auto}
 @media(min-width:1024px){
  #topbar{position:sticky;top:0;z-index:20}
@@ -29,7 +33,7 @@ main div:has(>table){overflow-x:auto}
  #dlg{width:min(92vw,42rem)}
  #dlg [class*="max-h-["]{max-height:calc(100vh - 17rem)!important}
 }
-@media(min-width:1536px){main{font-size:15px}}
+@media(min-width:1536px){main{font-size:14px}}
 @page{margin:14mm}
 @media print{body{background:#fff}#app,#toast,dialog{display:none!important}#printArea{display:block!important;color:#111;font-size:10pt}
 #printArea table{width:100%;border-collapse:collapse;font-size:8pt}#printArea th,#printArea td{border-bottom:1px solid #ddd;padding:3px 4px;text-align:left;vertical-align:top}
@@ -45,6 +49,7 @@ main div:has(>table){overflow-x:auto}
 // ---- VERSION: increase with every revision (also update the user guide's "applies to") ----
 // 1.11.0 Records shows just "Audit log" when trade compliance is off. Suppliers: Import and Export (CSV) and exception filters. Every page opens with a line saying what is expected.
 //        Every dialog has an X in its corner. Government data: the "Where to update each one" section is gone; Load list is a button on the table row.
+// 1.14.2 Smaller type: body text is 13px and the other sizes scale with it (xs 11, sm 13, base 15, lg 17, xl 19, 2xl 22, 3xl 28; 14px body on screens 1536px and wider).
 // 1.14.1 Dashboard: page title is "Dashboard"; Priority and Issue type filters share one row (chips on wide screens, drop-down lists on small ones); search sits on the row below.
 // 1.14.0 Dashboard redesign: KPI cards (compliance ring, missing CMRT, smelter reviews, open requests), severity bar, and one filterable Requires attention list (priority, issue type, search, expandable rows). CMRT check and By area tiles are folded into it.
 // 1.13.0 Configuration moves out of the tab strip into a wrench (Settings) icon left of the bell and user icon; same drop-down, count pill on the icon.
@@ -93,7 +98,7 @@ main div:has(>table){overflow-x:auto}
 //        government-contract flags (FAR Part 12 / TAA / BAA), shipment-check levels (Trade > Rules), order file download.
 //        Fixed: date-only values no longer show a day early in US time zones.
 // 1.0.0  First versioned release. Added the user guide link.
-const APP_VERSION = '1.14.1';
+const APP_VERSION = '1.14.2';
 // ---- CONFIG: paste your Supabase project values -------------------------------
 const CFG = {
   url: 'https://sjwarllnehssyphoormc.supabase.co',                    // https://xxxx.supabase.co
@@ -301,7 +306,7 @@ function shell(inner) {
     <nav class="flex gap-1 order-last w-full overflow-x-auto 2xl:order-none 2xl:w-auto 2xl:overflow-visible">${NAV.map((n, gi) => gi === cfgI ? '' : n.items ? group(n, gi) : tab(n)).join('')}</nav>
     <div class="ml-auto flex items-center gap-3"><a href="./conformality_user_guide.html" target="_blank" rel="noopener" class="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium border border-slate-300 hover:bg-slate-100 text-slate-700">${ico('book')}User guide</a>
       ${cfgBtn}
-      <button id="bellBtn" data-a="bell" aria-haspopup="true" title="Overdue items, blocked orders and escalations" class="${iconBtn}">${ico('bell', 'h-5 w-5')}<span id="bellCount" class="${nb ? '' : 'hidden'} absolute -top-1.5 -right-1.5 rounded-full bg-amber-600 px-1.5 text-[11px] font-semibold leading-4 text-white">${nb > 99 ? '99+' : nb}</span></button>
+      <button id="bellBtn" data-a="bell" aria-haspopup="true" title="Overdue items, blocked orders and escalations" class="${iconBtn}">${ico('bell', 'h-5 w-5')}<span id="bellCount" class="${nb ? '' : 'hidden'} absolute -top-1.5 -right-1.5 rounded-full bg-amber-600 px-1.5 text-[10px] font-semibold leading-4 text-white">${nb > 99 ? '99+' : nb}</span></button>
       <button id="userBtn" data-a="userMenu" aria-haspopup="true" title="${esc(profile?.full_name || user?.email || 'Account')}" class="${iconBtn}">${ico('user', 'h-5 w-5')}</button></div>
   </div></header>
   <main class="max-w-[1920px] mx-auto px-4 lg:px-8 py-5 lg:py-6">${inner}</main>`;
@@ -2294,7 +2299,7 @@ const actions = {
     m.id = 'navmenu'; m.dataset.g = d.g; m.setAttribute('role', 'menu');
     m.style.cssText = `position:fixed;top:${Math.round(r.bottom + 4)}px;left:${Math.round(Math.max(8, Math.min(r.left, window.innerWidth - 240)))}px;z-index:60;min-width:12rem`;
     m.className = 'rounded-xl bg-white border border-slate-200 shadow-lg p-1';
-    m.innerHTML = g.items.map(([v, label, ic, t]) => { if (v === '--') return `<div class="px-3 pt-2 pb-1 mt-1 border-t border-slate-100 text-[11px] font-semibold uppercase tracking-wide text-slate-400">${esc(label)}</div>`; const n = menuCount(v, t); return `<button data-a="nav" data-v="${v}" ${t ? `data-t="${t}"` : ''} role="menuitem" class="flex items-center gap-2 w-full text-left px-3 py-2 text-sm rounded-lg ${itemOn(v, t) ? 'bg-slate-900 text-white' : 'text-slate-700 hover:bg-slate-100'}">${ico(ic)}<span class="flex-1">${label}</span>${pillHtml(n)}</button>`; }).join('');
+    m.innerHTML = g.items.map(([v, label, ic, t]) => { if (v === '--') return `<div class="px-3 pt-2 pb-1 mt-1 border-t border-slate-100 text-[10px] font-semibold uppercase tracking-wide text-slate-400">${esc(label)}</div>`; const n = menuCount(v, t); return `<button data-a="nav" data-v="${v}" ${t ? `data-t="${t}"` : ''} role="menuitem" class="flex items-center gap-2 w-full text-left px-3 py-2 text-sm rounded-lg ${itemOn(v, t) ? 'bg-slate-900 text-white' : 'text-slate-700 hover:bg-slate-100'}">${ico(ic)}<span class="flex-1">${label}</span>${pillHtml(n)}</button>`; }).join('');
     document.body.appendChild(m);
     if (btnEl.id === 'cfgBtn') m.style.left = Math.round(Math.max(8, Math.min(r.right - m.offsetWidth, window.innerWidth - m.offsetWidth - 8))) + 'px';   // wrench sits at the right: open the menu flush with its right edge
   },
