@@ -49,6 +49,7 @@ main div:has(>table){overflow-x:auto}
 // ---- VERSION: increase with every revision (also update the user guide's "applies to") ----
 // 1.11.0 Records shows just "Audit log" when trade compliance is off. Suppliers: Import and Export (CSV) and exception filters. Every page opens with a line saying what is expected.
 //        Every dialog has an X in its corner. Regulatory data: the "Where to update each one" section is gone; Load list is a button on the table row.
+// 1.21.0 Audit log redesigned: cards (total, user actions, imports, data updates, security & access), one filter row (search, event type, object, user, date range), event-type pills, paged table with a row menu.
 // 1.20.1 Regulatory data: the tabs are replaced by a multi-select Source drop-down (Government lists, Reference data) beside Status.
 // 1.20.0 Regulatory data page redesigned: cards (Data sources, Up to date, Update due, Action needed, About), search with multi-select Source (Government lists, Reference data) and Status filters, and a table with description, dates, status and an action button per source.
 // 1.19.0 Suppliers filters (Compliance status, Issue type, CMRT year) are multi-select checklists; every option in the Suppliers and Dashboard filter drop-downs has an icon.
@@ -107,7 +108,7 @@ main div:has(>table){overflow-x:auto}
 //        government-contract flags (FAR Part 12 / TAA / BAA), shipment-check levels (Trade > Rules), order file download.
 //        Fixed: date-only values no longer show a day early in US time zones.
 // 1.0.0  First versioned release. Added the user guide link.
-const APP_VERSION = '1.20.1';
+const APP_VERSION = '1.21.0';
 // ---- CONFIG: paste your Supabase project values -------------------------------
 const CFG = {
   url: 'https://sjwarllnehssyphoormc.supabase.co',                    // https://xxxx.supabase.co
@@ -1993,7 +1994,31 @@ async function ofZip(id) {
 // ---- audit trail ---------------------------------------------------------------
 const AUD_AREA = { documents: 'Document', parties: 'Party', party_contacts: 'Contact', skus: 'Product (SKU)', cases: 'Case', case_events: 'Case note', requests: 'Request', request_events: 'Request event', request_campaigns: 'Request campaign', cmrt_declarations: 'CMRT declaration', cmrt_smelters: 'CMRT smelter', reference_list_loads: 'Reference list load', classifications: 'Classification', ownership_links: 'Ownership link', ownership_submissions: 'Ownership submission', portal_links: 'Portal link', portal_events: 'Portal visit', published_reports: 'Customer report', profiles: 'User account', app_settings: 'Setting', document_types: 'Document type', screening_runs: 'Screening run', screenings: 'Screening', screening_hits: 'Screening hit', screening_clearances: 'Screening clearance', transactions: 'Order', transaction_lines: 'Order item', transaction_parties: 'Transaction party', country_rules: 'Country rule', rule_profiles: 'Rule profile' };
 const AUD_ACT = { insert: 'Created', update: 'Changed', delete: 'Deleted' };
-let auditF = { from: '', to: '', area: '', action: '', q: '' }, auditRows = [];
+// Event types shown in the Audit log: derived from the stored action plus the table, because the log itself only records insert / update / delete.
+const AUD_TYPES = { create: ['Create', 'plus', 'bg-emerald-100 text-emerald-700', 'text-emerald-600'], import: ['Import', 'upload', 'bg-blue-100 text-blue-700', 'text-blue-600'], update: ['Update', 'refresh', 'bg-blue-100 text-blue-700', 'text-blue-600'], request: ['Request', 'send', 'bg-violet-100 text-violet-700', 'text-violet-600'], resolve: ['Resolve', 'check', 'bg-emerald-100 text-emerald-700', 'text-emerald-600'], access: ['Access', 'wrench', 'bg-slate-200 text-slate-700', 'text-slate-600'], delete: ['Delete', 'x', 'bg-red-100 text-red-700', 'text-red-600'] };
+const AUD_RESOLVED = ['resolved', 'closed', 'fulfilled', 'cleared', 'accepted', 'completed'];
+function auditType(r) {
+  const t = r.table_name, o = r.old_data || {}, n = r.new_data || {};
+  if (r.action === 'delete') return 'delete';
+  if (['portal_events', 'portal_links', 'profiles'].includes(t)) return 'access';
+  if (t === 'reference_list_loads' && r.action === 'insert') return 'import';
+  if (r.action === 'insert') return t === 'screening_clearances' ? 'resolve' : ['requests', 'request_events', 'request_campaigns'].includes(t) ? 'request' : 'create';
+  if (n.status && n.status !== o.status && AUD_RESOLVED.includes(String(n.status).toLowerCase())) return 'resolve';
+  return 'update';
+}
+const audObjIcon = (t) => ({ parties: 'building', party_contacts: 'user', documents: 'filetext', requests: 'send', request_events: 'send', request_campaigns: 'send', cases: 'alert', case_events: 'alert', classifications: 'filecheck', transactions: 'package', transaction_lines: 'package', transaction_parties: 'package', skus: 'tag', profiles: 'users', portal_links: 'globe', portal_events: 'globe', app_settings: 'sliders', reference_list_loads: 'landmark', country_rules: 'globe', rule_profiles: 'list' }[t] || (/^(screening|ownership)/.test(t) ? 'shield' : /^cmrt/.test(t) ? 'filecheck' : 'scroll'));
+const audObj = (r) => AUD_AREA[r.table_name] || r.table_name;
+function auditDetail(r) {
+  const ty = auditType(r), lab = auditLabel(r), o = audObj(r).toLowerCase();
+  if (ty === 'delete') return `Removed ${o}${lab ? ': ' + lab : ''}`;
+  if (ty === 'import') return `Loaded ${lab ? lab : 'a reference list'}`;
+  if (ty === 'create' || ty === 'request') return `${ty === 'request' ? 'Sent' : 'Added'} ${o}${lab ? ': ' + lab : ''}`;
+  if (ty === 'resolve' && r.action === 'insert') return `Recorded ${o}${lab ? ': ' + lab : ''}`;
+  return (lab ? lab + ' · ' : '') + auditSummary(r);
+}
+const AUD_RANGES = { 7: 'Last 7 days', 30: 'Last 30 days', 90: 'Last 90 days', 365: 'Last 12 months', all: 'All time', custom: 'Custom range' };
+let auditF = { q: '', ty: new Set(), ob: new Set(), us: new Set(), userOnly: false, range: '30', from: '', to: '', sort: 'desc', page: 1 }, auditRows = [], audAll = [], audTotal = 0, audMs = null;
+const AUD_PAGE = 10, AUD_CAP = 3000;
 const auditLabel = (r) => { const d = r.new_data || r.old_data || {}; return d.title || d.name || d.subject || d.sku || d.matched_name || d.reference || d.email || d.key || d.code || d.file_name || (d.case_no ? '#' + d.case_no : '') || ''; };
 const clip = (v, n = 60) => { const t = v === null || v === undefined ? '-' : typeof v === 'object' ? JSON.stringify(v) : String(v); return t.length > n ? t.slice(0, n) + '…' : t; };
 function auditSummary(r) {
@@ -2005,14 +2030,17 @@ function auditSummary(r) {
 }
 const auditWho = (r) => r.actor_email || (r.actor ? r.actor : 'System or external visitor');
 const auditWhen = (t) => new Date(t).toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' });
-const applyAF = (q) => {
-  if (auditF.from) q = q.gte('at', new Date(auditF.from + 'T00:00:00').toISOString());
-  if (auditF.to) q = q.lte('at', new Date(auditF.to + 'T23:59:59.999').toISOString());
-  if (auditF.area) q = q.eq('table_name', auditF.area);
-  if (auditF.action) q = q.eq('action', auditF.action);
-  return q;
+const audBounds = () => {
+  const f = auditF; if (f.range === 'all') return {};
+  if (f.range === 'custom') return { from: f.from ? new Date(f.from + 'T00:00:00').toISOString() : '', to: f.to ? new Date(f.to + 'T23:59:59.999').toISOString() : '' };
+  return { from: new Date(Date.now() - Number(f.range) * 864e5).toISOString() };
 };
-const auditMatch = (r) => { const q = auditF.q.trim().toLowerCase(); return !q || [auditSummary(r), auditWho(r), auditLabel(r), r.row_id, AUD_AREA[r.table_name] || r.table_name].join(' ').toLowerCase().includes(q); };
+const applyAF = (q) => { const b = audBounds(); if (b.from) q = q.gte('at', b.from); if (b.to) q = q.lte('at', b.to); return q; };
+const audPass = (r) => {
+  const f = auditF, q = f.q.trim().toLowerCase();
+  return (!f.ty.size || f.ty.has(auditType(r))) && (!f.ob.size || f.ob.has(r.table_name)) && (!f.us.size || f.us.has(auditWho(r))) && (!f.userOnly || r.actor)
+    && (!q || [auditDetail(r), auditWho(r), auditLabel(r), r.row_id, audObj(r), AUD_TYPES[auditType(r)][0]].join(' ').toLowerCase().includes(q));
+};
 async function loadAuditAll(cap) {
   let out = [], from = 0, full = false;
   for (;;) {
@@ -2022,7 +2050,7 @@ async function loadAuditAll(cap) {
     if (!full || out.length >= cap) break; from += 1000;
   }
   const truncated = full && out.length >= cap; if (out.length > cap) out = out.slice(0, cap);
-  return { rows: out.filter(auditMatch), truncated };
+  return { rows: out.filter(audPass), truncated };
 }
 async function verifyChain() {
   const box = $('#chainBox'); if (box) box.innerHTML = '<span class="text-slate-500">Verifying integrity…</span>';
@@ -2031,37 +2059,82 @@ async function verifyChain() {
   const v = data[0]; if (box) box.innerHTML = v.is_valid ? badge(`Integrity verified · ${v.rows_checked} entries`, 'green') : badge(`Integrity problem at entry #${v.first_bad_id}`, 'red');
   return v;
 }
+const audCardOn = (k) => k === '' ? !auditF.ty.size && !auditF.userOnly : k === 'user' ? auditF.userOnly && !auditF.ty.size : auditF.ty.size === 1 && auditF.ty.has(k) && !auditF.userOnly;
+function audMsHtml() {
+  const cnt = (f) => audAll.filter(f).length, blk = (label, inner, cls) => `<div class="min-w-0 flex-1 basis-36 ${cls}"><div class="mb-1 text-sm font-semibold text-slate-800">${label}</div>${inner}</div>`;
+  const tys = Object.keys(AUD_TYPES).filter((k) => audAll.some((r) => auditType(r) === k)), tbls = [...new Set(audAll.map((r) => r.table_name))].sort((a, b) => (AUD_AREA[a] || a).localeCompare(AUD_AREA[b] || b));
+  const users = [...new Set(audAll.map(auditWho))].sort((a, b) => a.localeCompare(b));
+  return blk('Event type', msHtml({ g: 'ty', act: 'audMsPick', openAct: 'audMsOpen', allLabel: 'All event types', set: auditF.ty, open: audMs === 'ty', opts: tys.map((k) => [k, AUD_TYPES[k][0], cnt((r) => auditType(r) === k), AUD_TYPES[k][1], AUD_TYPES[k][3]]) }), 'md:max-w-[12rem]')
+    + blk('Object', msHtml({ g: 'ob', act: 'audMsPick', openAct: 'audMsOpen', allLabel: 'All objects', set: auditF.ob, open: audMs === 'ob', opts: tbls.map((t) => [t, AUD_AREA[t] || t, cnt((r) => r.table_name === t), audObjIcon(t), 'text-slate-600']) }), 'md:max-w-[12rem]')
+    + blk('User', msHtml({ g: 'us', act: 'audMsPick', openAct: 'audMsOpen', allLabel: 'All users', set: auditF.us, open: audMs === 'us', opts: users.map((u) => [u, u, cnt((r) => auditWho(r) === u), 'user', 'text-slate-600']) }), 'md:max-w-[12rem]');
+}
+function audRowHtml(r) {
+  const [tl, ti, tc] = AUD_TYPES[auditType(r)], d = new Date(r.at);
+  return `<tr class="hover:bg-slate-50">
+    <td class="p-3 whitespace-nowrap"><div class="font-medium text-slate-900">${esc(d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }))}</div><div class="text-xs text-slate-500">${esc(d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }))}</div></td>
+    <td class="p-3 text-slate-800">${esc(auditWho(r))}</td>
+    <td class="p-3"><span class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1 text-sm font-medium ${tc}">${ico(ti, 'h-4 w-4')}${tl}</span></td>
+    <td class="p-3 whitespace-nowrap"><span class="inline-flex items-center gap-2 text-slate-800"><span class="text-slate-500">${ico(audObjIcon(r.table_name), 'h-4 w-4')}</span>${esc(audObj(r))}</span></td>
+    <td class="p-3 text-slate-700 max-w-md break-words">${esc(clip(auditDetail(r), 160))}</td>
+    <td class="p-3 text-right"><button data-a="audRowMenu" data-id="${esc(r.id)}" aria-haspopup="true" aria-label="More actions for entry ${esc(r.id)}" class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100 align-middle">${ico('dots', 'h-5 w-5')}</button></td></tr>`;
+}
+function audFiltered() { const s = auditF.sort === 'asc' ? 1 : -1; return audAll.filter(audPass).sort((a, b) => (Number(a.id) - Number(b.id)) * s); }
+function paintAud() {
+  const list = audFiltered(), pages = Math.max(1, Math.ceil(list.length / AUD_PAGE)); auditF.page = Math.min(Math.max(1, auditF.page), pages);
+  const from = (auditF.page - 1) * AUD_PAGE, part = list.slice(from, from + AUD_PAGE), body = document.getElementById('audBody'); if (!body) return;
+  auditRows = audAll;
+  body.innerHTML = part.map(audRowHtml).join('') || `<tr><td class="p-8 text-center text-slate-500" colspan="6">${audAll.length ? 'No events match these filters.' : 'No events in this period.'}</td></tr>`;
+  const c = document.getElementById('audCount'); if (c) c.textContent = list.length ? `Showing ${from + 1}-${from + part.length} of ${list.length} event${list.length === 1 ? '' : 's'}` : 'No events';
+  const nums = pages <= 7 ? Array.from({ length: pages }, (_, i) => i + 1) : [...new Set([1, 2, auditF.page - 1, auditF.page, auditF.page + 1, pages - 1, pages].filter((p) => p >= 1 && p <= pages))].sort((a, b) => a - b);
+  const pb = (inner, p, on, dis) => `<button data-a="audPage" data-p="${p}" ${dis ? 'disabled' : ''} ${on ? 'aria-current="page"' : ''} class="inline-flex h-9 min-w-[2.25rem] items-center justify-center rounded-lg border px-2 text-sm ${on ? 'border-slate-900 bg-slate-900 font-semibold text-white' : 'border-slate-200 bg-white text-slate-800 hover:bg-slate-100'} ${dis ? 'opacity-40' : ''}">${inner}</button>`;
+  const pg = document.getElementById('audPager'); if (pg) pg.innerHTML = pages > 1 ? pb(ico('chevl'), auditF.page - 1, false, auditF.page <= 1) + nums.map((p, i) => (i && p - nums[i - 1] > 1 ? '<span class="px-1 text-slate-400">...</span>' : '') + pb(p, p, p === auditF.page)).join('') + pb(ico('chevr'), auditF.page + 1, false, auditF.page >= pages) : '';
+  const cnt = (f) => audAll.filter(f).length, total = audAll.length, pctOf = (n) => (total ? Math.round(n / total * 100) : 0) + '%', card = 'rounded-2xl bg-white border border-slate-200 shadow-sm';
+  const kpi = (k, icon, tone, label, n, pct) => { const on = audCardOn(k); return `<button type="button" data-a="audCard" data-k="${k}" aria-pressed="${on}" class="${card} flex items-center gap-4 px-5 py-4 text-left hover:border-slate-400 ${on ? 'border-slate-900 ring-2 ring-slate-900' : ''}"><span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${tone}">${ico(icon, 'h-6 w-6')}</span><span class="min-w-0"><span class="block font-semibold text-slate-900">${label}</span><span class="block text-3xl font-bold leading-tight text-slate-900">${n.toLocaleString()}${pct ? ` <span class="text-base font-normal text-slate-600">(${pct})</span>` : ''}</span></span></button>`; };
+  const cards = document.getElementById('audCards'); if (cards) cards.innerHTML = kpi('', 'scroll', 'bg-slate-100 text-slate-600', 'Total events', total) + kpi('user', 'user', 'bg-blue-50 text-blue-600', 'User actions', cnt((r) => r.actor), pctOf(cnt((r) => r.actor))) + kpi('import', 'upload', 'bg-violet-50 text-violet-600', 'Imports', cnt((r) => auditType(r) === 'import'), pctOf(cnt((r) => auditType(r) === 'import'))) + kpi('update', 'refresh', 'bg-amber-50 text-amber-500', 'Data updates', cnt((r) => auditType(r) === 'update'), pctOf(cnt((r) => auditType(r) === 'update'))) + kpi('access', 'shield', 'bg-emerald-50 text-emerald-600', 'Security & access', cnt((r) => auditType(r) === 'access'), pctOf(cnt((r) => auditType(r) === 'access')));
+  const note = document.getElementById('audNote'); if (note) note.textContent = audTotal > audAll.length ? `This period has ${audTotal.toLocaleString()} events. The ${audAll.length.toLocaleString()} most recent are shown here; narrow the date range, or use Export CSV for the full set.` : '';
+  const ms = document.getElementById('audMs'); if (ms) ms.innerHTML = audMsHtml();
+  const th = document.getElementById('audSortIco'); if (th) th.innerHTML = ico(auditF.sort === 'asc' ? 'sortup' : 'sortdown', 'h-4 w-4');
+}
 async function renderAudit() {
-  const inp = 'mt-1 w-full rounded-lg border border-slate-300 p-2 text-sm';
-  shell(`<div class="flex flex-wrap items-center gap-3 mb-4"><h2 class="text-xl font-semibold">Audit trail</h2><div id="chainBox" class="ml-auto text-sm"></div><p class="basis-full text-sm text-slate-500 -mt-1">The permanent record of who changed what, and when. Expected: the chain check below says it is intact. Entries cannot be edited or deleted, and each one is chained to the one before so any tampering shows.</p></div>
-  <div class="rounded-xl bg-white border border-slate-200 p-4 mb-4"><div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-5 items-end">
-    <label class="text-sm">From<input id="aFrom" type="date" class="${inp}"></label><label class="text-sm">To<input id="aTo" type="date" class="${inp}"></label>
-    <label class="text-sm">Area<select id="aArea" class="${inp}"><option value="">All areas</option>${Object.entries(AUD_AREA).sort((a, b) => a[1].localeCompare(b[1])).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></label>
-    <label class="text-sm">Action<select id="aAct" class="${inp}"><option value="">All</option>${Object.entries(AUD_ACT).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></label>
-    <label class="text-sm">Search<input id="aQ" placeholder="User, record, change" class="${inp}"></label></div>
-    <div class="mt-3 flex flex-wrap gap-2">${btn('Apply filters', 'auditApply')}${btn('Export CSV', 'auditCsv', {}, 'ghost')}${btn('Print / save as PDF report', 'auditPrint', {}, 'ghost')}</div></div>
-  <div id="auditList"><p class="text-slate-500">Loading…</p></div>`);
-  $('#aFrom').value = auditF.from; $('#aTo').value = auditF.to; $('#aArea').value = auditF.area; $('#aAct').value = auditF.action; $('#aQ').value = auditF.q;
-  $('#aQ').onkeydown = (e) => { if (e.key === 'Enter') actions.auditApply(); };
-  verifyChain(); loadAuditList();
+  const f = auditF, dIn = 'rounded-lg border border-slate-200 bg-white py-1.5 px-3 text-sm shadow-sm';
+  shell(`<div class="flex flex-col gap-4"><div class="flex flex-wrap items-end justify-between gap-x-6 gap-y-3"><div><h1 class="text-3xl font-bold tracking-tight text-slate-900">Audit log</h1>
+    <p class="max-w-3xl text-slate-600">Track changes, imports and key activities across Conformality for traceability and compliance. Entries cannot be edited or deleted, and each is chained to the one before it.</p></div>
+    <div class="flex flex-wrap items-center gap-2"><div id="chainBox" class="text-sm"></div>${btn('Export CSV', 'auditCsv', {}, 'ghost')}${btn('Print / save as PDF', 'auditPrint', {}, 'ghost')}</div></div>
+  <div id="audCards" class="grid gap-4 sm:grid-cols-2 xl:grid-cols-5"></div>
+  <div class="flex flex-wrap items-end gap-x-3 gap-y-3 md:flex-nowrap">
+    <div class="min-w-0 flex-[2] basis-48"><div class="mb-1 text-sm font-semibold text-slate-800">Search</div><label class="relative block"><span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-600">${ico('search', 'h-5 w-5')}</span><input id="audQ" type="search" value="${esc(f.q)}" placeholder="Search events..." class="w-full rounded-lg border border-slate-200 bg-white py-1.5 pl-10 pr-3 text-sm shadow-sm"></label></div>
+    <div id="audMs" class="contents"></div>
+    <div class="min-w-0 flex-1 basis-40 md:max-w-[13rem]"><div class="mb-1 text-sm font-semibold text-slate-800">Date range</div><label class="relative block"><span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-600">${ico('cal', 'h-5 w-5')}</span><select id="audRange" class="w-full appearance-none rounded-lg border border-slate-200 bg-white py-1.5 pl-10 pr-8 text-sm text-slate-900 shadow-sm">${Object.entries(AUD_RANGES).map(([k, v]) => `<option value="${k}" ${f.range === k ? 'selected' : ''}>${v}</option>`).join('')}</select><span class="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-700">${ico('chevd')}</span></label></div>
+    <button data-a="audClear" class="shrink-0 pb-2 text-sm font-medium text-slate-600 hover:text-slate-900 hover:underline">Clear filters</button></div>
+  <div id="audCustom" class="${f.range === 'custom' ? '' : 'hidden'} flex flex-wrap items-center gap-3 text-sm"><label class="flex items-center gap-2">From<input id="audFrom" type="date" value="${esc(f.from)}" class="${dIn}"></label><label class="flex items-center gap-2">To<input id="audTo" type="date" value="${esc(f.to)}" class="${dIn}"></label></div>
+  <p id="audNote" class="text-sm text-amber-700"></p>
+  <div class="rounded-2xl bg-white border border-slate-200 shadow-sm overflow-x-auto"><table class="w-full text-sm">
+    <thead class="bg-slate-50 text-left text-xs font-semibold text-slate-600 border-b border-slate-200"><tr><th class="p-3"><button data-a="audSort" class="inline-flex items-center gap-1 font-semibold hover:text-slate-900">Date &amp; time <span id="audSortIco"></span></button></th><th class="p-3">User</th><th class="p-3">Event type</th><th class="p-3">Object</th><th class="p-3">Details</th><th class="p-3"><span class="sr-only">Actions</span></th></tr></thead>
+    <tbody id="audBody" class="divide-y divide-slate-100"><tr><td class="p-8 text-center text-slate-500" colspan="6">Loading…</td></tr></tbody></table></div>
+  <div class="flex flex-wrap items-center justify-between gap-3"><span id="audCount" class="text-sm text-slate-600"></span><div id="audPager" class="flex items-center gap-1.5"></div></div></div>`);
+  $('#audQ').oninput = (e) => { auditF.q = e.target.value; auditF.page = 1; paintAud(); };
+  $('#audRange').onchange = (e) => { auditF.range = e.target.value; $('#audCustom').classList.toggle('hidden', auditF.range !== 'custom'); if (auditF.range !== 'custom' || auditF.from || auditF.to) loadAudit(); };
+  $('#audFrom').onchange = (e) => { auditF.from = e.target.value; loadAudit(); }; $('#audTo').onchange = (e) => { auditF.to = e.target.value; loadAudit(); };
+  verifyChain(); paintAud(); loadAudit();
 }
-async function loadAuditList() {
-  const { data, error, count } = await applyAF(sb.from('audit_log').select('*', { count: 'exact' })).order('id', { ascending: false }).limit(500);
-  const box = $('#auditList'); if (!box) return;
-  if (error) { box.innerHTML = `<div class="rounded-xl bg-red-50 border border-red-200 p-4 text-sm text-red-700">${esc(error.message)}</div>`; return; }
-  auditRows = data.filter(auditMatch);
-  box.innerHTML = `<p class="text-sm text-slate-500 mb-2">${count} matching entries${count > 500 ? ', showing the latest 500. Narrow the filters or export for the full set.' : ''}${auditF.q ? ` · ${auditRows.length} match the search` : ''}</p>
-  <div class="rounded-xl bg-white border border-slate-200 overflow-x-auto"><table class="w-full text-sm"><thead class="text-left text-slate-500 border-b border-slate-200"><tr><th class="p-3">#</th><th class="p-3">When</th><th class="p-3">Who</th><th class="p-3">Action</th><th class="p-3">Record</th><th class="p-3">What changed</th><th class="p-3"></th></tr></thead>
-  <tbody class="divide-y divide-slate-100">${auditRows.map((r) => `<tr><td class="p-3 text-slate-400">${r.id}</td><td class="p-3 whitespace-nowrap">${esc(auditWhen(r.at))}</td><td class="p-3">${esc(auditWho(r))}</td><td class="p-3">${badge(AUD_ACT[r.action], r.action === 'delete' ? 'red' : r.action === 'update' ? 'amber' : 'gray')}</td>
-  <td class="p-3"><div class="font-medium">${esc(AUD_AREA[r.table_name] || r.table_name)}</div><div class="text-xs text-slate-400 truncate max-w-[14rem]">${esc(auditLabel(r))}</div></td><td class="p-3 text-slate-600 max-w-md">${esc(auditSummary(r))}</td><td class="p-3 text-right">${btn('Details', 'auditRow', { id: r.id }, 'ghost')}</td></tr>`).join('') || '<tr><td colspan="7" class="p-8 text-center text-slate-500">No entries match.</td></tr>'}</tbody></table></div>`;
+async function loadAudit() {
+  let out = [], total = 0, err = null;
+  for (let from = 0; from < AUD_CAP; from += 1000) {
+    const { data, error, count } = await applyAF(sb.from('audit_log').select('*', from ? {} : { count: 'exact' })).order('id', { ascending: false }).range(from, Math.min(from + 999, AUD_CAP - 1));
+    if (error) { err = error; break; }
+    if (!from) total = count || 0;
+    out = out.concat(data); if (data.length < 1000) break;
+  }
+  const body = document.getElementById('audBody'); if (!body) return;
+  if (err) { body.innerHTML = `<tr><td class="p-6 text-sm text-red-700" colspan="6">${esc(err.message)}</td></tr>`; return; }
+  audAll = out; audTotal = total; auditF.page = 1; paintAud();
 }
-function readFilters() { auditF = { from: $('#aFrom').value, to: $('#aTo').value, area: $('#aArea').value, action: $('#aAct').value, q: $('#aQ').value }; }
 async function exportAuditCsv() {
   toast('Preparing export…');
   try {
     const { rows, truncated } = await loadAuditAll(100000); const q = (v) => '"' + String(v ?? '').replace(/"/g, '""') + '"';
-    const head = ['Entry ID', 'Time (UTC)', 'User email', 'User ID', 'Action', 'Area', 'Record ID', 'Summary', 'Old data', 'New data', 'Previous hash', 'Entry hash'];
-    const lines = [head.map(q).join(',')].concat(rows.map((r) => [r.id, new Date(r.at).toISOString(), r.actor_email, r.actor, r.action, AUD_AREA[r.table_name] || r.table_name, r.row_id, auditSummary(r), r.old_data ? JSON.stringify(r.old_data) : '', r.new_data ? JSON.stringify(r.new_data) : '', r.prev_hash, r.row_hash].map(q).join(',')));
+    const head = ['Entry ID', 'Time (UTC)', 'User email', 'User ID', 'Action', 'Event type', 'Area', 'Record ID', 'Summary', 'Old data', 'New data', 'Previous hash', 'Entry hash'];
+    const lines = [head.map(q).join(',')].concat(rows.map((r) => [r.id, new Date(r.at).toISOString(), r.actor_email, r.actor, r.action, AUD_TYPES[auditType(r)][0], AUD_AREA[r.table_name] || r.table_name, r.row_id, auditSummary(r), r.old_data ? JSON.stringify(r.old_data) : '', r.new_data ? JSON.stringify(r.new_data) : '', r.prev_hash, r.row_hash].map(q).join(',')));
     const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['﻿' + lines.join('\n')], { type: 'text/csv' })); a.download = `audit_trail_${new Date().toISOString().slice(0, 10)}.csv`; a.click();
     toast(`${rows.length} entries exported${truncated ? ' (limit reached; narrow the dates for the rest)' : ''}`);
   } catch (e) { toast(e.message || 'Export failed'); }
@@ -2073,7 +2146,7 @@ async function printAuditReport() {
     const company = typeof cs.data?.value === 'string' ? cs.data.value : '';
     const tz = Intl.DateTimeFormat().resolvedOptions().timeZone, now = new Date();
     const counts = {}; rows.forEach((r) => { const k = (AUD_AREA[r.table_name] || r.table_name) + '|' + r.action; counts[k] = (counts[k] || 0) + 1; });
-    const f = auditF, filt = [f.from && 'from ' + f.from, f.to && 'to ' + f.to, f.area && 'area: ' + (AUD_AREA[f.area] || f.area), f.action && 'action: ' + AUD_ACT[f.action], f.q && 'search: "' + f.q + '"'].filter(Boolean).join(', ') || 'none (all entries)';
+    const f = auditF, bd = audBounds(), filt = [f.range === 'custom' ? [f.from && 'from ' + f.from, f.to && 'to ' + f.to].filter(Boolean).join(' ') : f.range !== 'all' && AUD_RANGES[f.range].toLowerCase(), f.ty.size && 'event type: ' + [...f.ty].map((k) => AUD_TYPES[k][0]).join(', '), f.ob.size && 'object: ' + [...f.ob].map((k) => AUD_AREA[k] || k).join(', '), f.us.size && 'user: ' + [...f.us].join(', '), f.userOnly && 'user actions only', f.q && 'search: "' + f.q + '"'].filter(Boolean).join('; ') || 'none (all entries)';
     const last = rows[rows.length - 1];
     $('#printArea').innerHTML = `<h1>Compliance audit report</h1><div style="margin-top:2px">${esc(company)}</div>
     <p style="margin:8px 0">Generated ${esc(now.toLocaleString())} (${esc(tz)}) by ${esc(profile?.full_name || user?.email || '')}<br>Filters: ${esc(filt)}<br>Entries in this report: ${rows.length}${truncated ? ' (limited to the first 5,000; export the CSV for the full set)' : ''}${rows.length ? `<br>Entry range: #${rows[0].id} to #${last.id}, ${esc(auditWhen(rows[0].at))} to ${esc(auditWhen(last.at))}` : ''}</p>
@@ -2153,9 +2226,16 @@ async function mkCorrection() {
 const actions = {
   mkCorrection: () => mkCorrection(),
   copyFull: async () => { await navigator.clipboard.writeText(actions.crxFull || ''); toast('Email text copied'); },
-  auditApply: () => { readFilters(); loadAuditList(); },
-  auditCsv: () => { readFilters(); exportAuditCsv(); },
-  auditPrint: () => { readFilters(); printAuditReport(); },
+  auditCsv: () => exportAuditCsv(),
+  auditPrint: () => printAuditReport(),
+  audCard: ({ k }) => { const on = audCardOn(k); auditF.ty.clear(); auditF.userOnly = false; if (k === 'user' && !on) auditF.userOnly = true; else if (k && k !== 'user' && !on) auditF.ty.add(k); audMs = null; auditF.page = 1; paintAud(); },
+  audMsOpen: ({ g }) => { audMs = audMs === g ? null : g; paintAud(); },
+  audMsPick: ({ g, k }) => { const set = auditF[g]; if (!k) set.clear(); else if (set.has(k)) set.delete(k); else set.add(k); auditF.page = 1; paintAud(); },
+  audClear: () => { Object.assign(auditF, { q: '', userOnly: false, page: 1 }); auditF.ty.clear(); auditF.ob.clear(); auditF.us.clear(); audMs = null; const q = document.getElementById('audQ'); if (q) q.value = ''; paintAud(); },
+  audSort: () => { auditF.sort = auditF.sort === 'asc' ? 'desc' : 'asc'; paintAud(); },
+  audPage: ({ p }) => { auditF.page = Number(p); paintAud(); },
+  audRowMenu: ({ id }) => { const r = audAll.find((x) => String(x.id) === String(id)) || {}; popMenu('aud' + id, `[data-a="audRowMenu"][data-id="${id}"]`, `<button data-a="audGo" data-x="detail" data-id="${esc(id)}" role="menuitem" class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm hover:bg-slate-100 rounded-t-xl">${ico('info')}Details</button><button data-a="audGo" data-x="user" data-id="${esc(id)}" role="menuitem" class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm hover:bg-slate-100 rounded-b-xl">${ico('user')}Show only ${esc(r.actor_email ? 'this user' : 'these events')}</button>`, 224); },
+  audGo: ({ x, id }) => { closeNavMenu(); const r = audAll.find((y) => String(y.id) === String(id)); if (!r) return; if (x === 'detail') actions.auditRow({ id }); else { auditF.us.clear(); auditF.us.add(auditWho(r)); auditF.page = 1; paintAud(); } },
   auditRow: ({ id }) => {
     const r = auditRows.find((x) => String(x.id) === String(id)); if (!r) return;
     const pre = (o) => o ? `<pre class="mt-1 max-h-48 overflow-auto rounded bg-slate-50 border border-slate-200 p-2 text-xs">${esc(JSON.stringify(o, null, 2))}</pre>` : '<div class="text-xs text-slate-400">None</div>';
@@ -2726,7 +2806,8 @@ document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeNavMe
 document.addEventListener('click', (e) => { if (dashMs && !e.target.closest('[data-mswrap]')) { dashMs = null; if (view === 'today' && dash) paintDash(); }
   if (govMs && !e.target.closest('[data-mswrap]')) { govMs = null; if (view === 'govdata') paintGov(); }
   if (supMs && !e.target.closest('[data-mswrap]')) { supMs = null; if (view === 'suppliers') paintSup(); }
-  if (!e.target.closest('#navmenu') && !e.target.closest('[data-a="menu"],[data-a="bell"],[data-a="userMenu"],[data-a="dashMore"],[data-a="supMore"],[data-a="supRowMenu"],[data-a="govRowMenu"]')) closeNavMenu(); });
+  if (audMs && !e.target.closest('[data-mswrap]')) { audMs = null; if (view === 'audit') paintAud(); }
+  if (!e.target.closest('#navmenu') && !e.target.closest('[data-a="menu"],[data-a="bell"],[data-a="userMenu"],[data-a="dashMore"],[data-a="supMore"],[data-a="supRowMenu"],[data-a="govRowMenu"],[data-a="audRowMenu"]')) closeNavMenu(); });
 document.addEventListener('click', (e) => { const b = e.target.closest('[data-a]'); if (b && actions[b.dataset.a]) actions[b.dataset.a](b.dataset); });
 document.addEventListener('change', (e) => { if (e.target.id === 'rqType') { const s = $('#rqSub'); if (s && !s.dataset.t) s.value = `${new Date().getFullYear()} ${actions.rq.types.find((x) => x.code === e.target.value)?.name || ''}`; } });
 document.addEventListener('input', (e) => { if (e.target.id === 'rqSub') e.target.dataset.t = '1'; if (e.target.id === 'dashQ') { dashQ = e.target.value; paintDashList(); } });
