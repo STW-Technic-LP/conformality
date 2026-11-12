@@ -49,6 +49,8 @@ main div:has(>table){overflow-x:auto}
 // ---- VERSION: increase with every revision (also update the user guide's "applies to") ----
 // 1.11.0 Records shows just "Audit log" when trade compliance is off. Suppliers: Import and Export (CSV) and exception filters. Every page opens with a line saying what is expected.
 //        Every dialog has an X in its corner. Regulatory data: the "Where to update each one" section is gone; Load list is a button on the table row.
+// 1.21.3 Audit log: the five card numbers come from one database call (audit_stats, part 16) instead of five scans; the list does no counting; the integrity check runs last.
+// 1.21.2 Audit log: counts are estimated for large result sets, and the cards and integrity check load after the table (avoids statement timeouts). New database part 16 adds indexes on audit_log.
 // 1.21.1 Audit log: 50 events a page, loaded one page at a time from the database, with First / Previous / page numbers / ... / last / Next / Last buttons; filters, search, sort and card counts run in the database.
 // 1.21.0 Audit log redesigned: cards (total, user actions, imports, data updates, security & access), one filter row (search, event type, object, user, date range), event-type pills, paged table with a row menu.
 // 1.20.1 Regulatory data: the tabs are replaced by a multi-select Source drop-down (Government lists, Reference data) beside Status.
@@ -109,7 +111,7 @@ main div:has(>table){overflow-x:auto}
 //        government-contract flags (FAR Part 12 / TAA / BAA), shipment-check levels (Trade > Rules), order file download.
 //        Fixed: date-only values no longer show a day early in US time zones.
 // 1.0.0  First versioned release. Added the user guide link.
-const APP_VERSION = '1.21.1';
+const APP_VERSION = '1.21.3';
 // ---- CONFIG: paste your Supabase project values -------------------------------
 const CFG = {
   url: 'https://sjwarllnehssyphoormc.supabase.co',                    // https://xxxx.supabase.co
@@ -300,7 +302,7 @@ function paintBell() {
 }
 async function refreshBell(force) {
   if (!sb || (!force && workCache && Date.now() - workCache.at < 60000)) return paintBell();
-  const [r, c, h] = await Promise.all([sb.from('v_open_work').select('*'), sb.from('v_data_currency').select('code,status'), sb.from('screening_hits').select('id', { count: 'exact', head: true }).eq('status', 'open')]);
+  const [r, c, h] = await Promise.all([sb.from('v_open_work').select('*'), sb.from('v_data_currency').select('code,status'), sb.from('screening_hits').select('id', { count: 'estimated', head: true }).eq('status', 'open')]);
   if (!r.error) workCache = { at: Date.now(), hits: h.error ? 0 : (h.count || 0), rows: r.data, cur: c.error ? (workCache && workCache.cur) || [] : c.data.filter(curOn) };
   paintBell();
 }
@@ -1293,7 +1295,7 @@ async function renderScreening() {
     sb.rpc('sanctions_summary'),
     sb.from('screening_hits').select('id,party_id,matched_name,score,band,country_corroborated,created_at,party:parties(name,country,address_line,kind),entry:sanctions_entries(source_list,name,entry_type,countries,programs,remarks,addresses,listed_on)').eq('status', 'open').order('score', { ascending: false }),
     sb.from('v_party_status').select('*').eq('is_active', true).order('name'),
-    sb.from('screening_hits').select('id', { count: 'exact', head: true }).eq('status', 'confirmed')]);
+    sb.from('screening_hits').select('id', { count: 'estimated', head: true }).eq('status', 'confirmed')]);
   const bad = [lo, sm, hi, pa, cf].find((r) => r.error); if (bad) return fail(bad.error);
   hitsById = new Map(hi.data.map((h) => [h.id, h]));
   const last = lo.data.find((l) => l.status === 'complete'), stale = last && daysAgo(last.loaded_at) > 14;
@@ -1370,7 +1372,7 @@ async function screenAll(runType) {
     const r = await sb.rpc('screen_party', { p_party: p.id, p_run: run.data.id });
     if (r.error) { if (/No screening lists/.test(r.error.message)) throw r.error; skipped.push(`${p.name}: ${r.error.message}`); }
   }
-  const oh = await sb.from('screening_hits').select('id', { count: 'exact', head: true }).eq('status', 'open');
+  const oh = await sb.from('screening_hits').select('id', { count: 'estimated', head: true }).eq('status', 'open');
   await sb.from('screening_runs').update({ finished_at: new Date().toISOString(), parties_screened: ps.data.length - skipped.length, hits_found: oh.count || 0 }).eq('id', run.data.id);
   return { n: ps.data.length - skipped.length, open: oh.count || 0, skipped };
 }
@@ -2144,28 +2146,40 @@ async function renderAudit() {
   $('#audRange').onchange = (e) => { auditF.range = e.target.value; auditF.page = 1; $('#audCustom').classList.toggle('hidden', auditF.range !== 'custom'); if (auditF.range !== 'custom' || auditF.from || auditF.to) { loadAuditCounts(); loadAudit(); } };
   $('#audFrom').onchange = (e) => { auditF.from = e.target.value; auditF.page = 1; loadAuditCounts(); loadAudit(); }; $('#audTo').onchange = (e) => { auditF.to = e.target.value; auditF.page = 1; loadAuditCounts(); loadAudit(); };
   audCounts = { total: null, user: null, import: null, update: null, access: null }; audAll = []; audTotal = 0; audLoading = true;
-  verifyChain(); paintAud(); loadAuditCounts(); loadAudit(); loadAuditUsers();
+  paintAud(); loadAuditCounts(); loadAudit(); audStatsP.then(() => { loadAuditUsers(); verifyChain(); });
 }
 // One page at a time (50 rows): the database filters, sorts and counts, so the page loads fast however large the log is.
-let audReq = 0;
+let audReq = 0, audCReq = 0, audStatsP = Promise.resolve();
+const audPlain = () => { const f = auditF; return !f.ty.size && !f.ob.size && !f.us.size && !f.userOnly && !f.q.trim(); };
 async function loadAudit() {
   const my = ++audReq; audLoading = true; paintAud();
-  const from = (auditF.page - 1) * AUD_PAGE;
-  const { data, error, count } = await applyFilters(sb.from('audit_log').select('*', { count: 'exact' })).order('id', { ascending: auditF.sort === 'asc' }).range(from, from + AUD_PAGE - 1);
+  const from = (auditF.page - 1) * AUD_PAGE, plain = audPlain();
+  // No filters: the total comes from the one-scan audit_stats call, so the list query does no counting at all. Filtered: use the planner's estimate (instant).
+  const { data, error, count } = await applyFilters(sb.from('audit_log').select('*', plain ? {} : { count: 'planned' })).order('id', { ascending: auditF.sort === 'asc' }).range(from, from + AUD_PAGE - 1);
   if (my !== audReq) return;
   const body = document.getElementById('audBody'); if (!body) return;
   audLoading = false;
   if (error) { body.innerHTML = `<tr><td class="p-6 text-sm text-red-700" colspan="6">${esc(error.message)}</td></tr>`; return; }
-  audAll = data; audTotal = count || 0;
-  if (!data.length && audTotal && auditF.page > 1) { auditF.page = Math.ceil(audTotal / AUD_PAGE); return loadAudit(); }
+  audAll = data; audTotal = plain ? (audCounts.total ?? (from + data.length + (data.length === AUD_PAGE ? 1 : 0))) : (count || 0);
   paintAud();
+  if (plain && audCounts.total === null) { await audStatsP; if (my === audReq) { audTotal = audCounts.total ?? audTotal; paintAud(); } }
 }
-async function loadAuditCounts() {
-  const my = ++audCReq, n = (extra) => { let q = applyAF(sb.from('audit_log').select('id', { count: 'exact', head: true })); return (extra ? extra(q) : q).then((r) => (r.error ? 0 : r.count || 0)); };
-  const [total, user, imp, upd, acc] = await Promise.all([n(), n((q) => q.not('actor', 'is', null)), n((q) => audTypeQ(q, ['import'])), n((q) => audTypeQ(q, ['update'])), n((q) => audTypeQ(q, ['access']))]);
-  if (my !== audCReq) return; audCounts = { total, user, import: imp, update: upd, access: acc }; paintAud();
+// All five card numbers in a single pass over the log (database function audit_stats, part 16). Falls back to separate counts if it is not installed yet.
+function loadAuditCounts() {
+  const my = ++audCReq, b = audBounds();
+  audStatsP = (async () => {
+    let c = null;
+    const r = await sb.rpc('audit_stats', { p_from: b.from || null, p_to: b.to || null });
+    if (!r.error && r.data && r.data[0]) { const x = r.data[0]; c = { total: Number(x.total), user: Number(x.users), import: Number(x.imports), update: Number(x.updates), access: Number(x.access) }; }
+    else {
+      const n = (extra) => { let q = applyAF(sb.from('audit_log').select('id', { count: 'estimated', head: true })); return (extra ? extra(q) : q).then((z) => (z.error ? 0 : z.count || 0)); };
+      const [total, user, imp, upd, acc] = await Promise.all([n(), n((q) => q.not('actor', 'is', null)), n((q) => audTypeQ(q, ['import'])), n((q) => audTypeQ(q, ['update'])), n((q) => audTypeQ(q, ['access']))]);
+      c = { total, user, import: imp, update: upd, access: acc };
+    }
+    if (my !== audCReq) return; audCounts = c; if (audPlain()) audTotal = c.total; paintAud();
+  })();
+  return audStatsP;
 }
-let audCReq = 0;
 async function loadAuditUsers() {
   const r = await sb.from('profiles').select('email'); if (!r.error && r.data) audUsers = r.data.map((x) => x.email).filter(Boolean);
   const ms = document.getElementById('audMs'); if (ms) ms.innerHTML = audMsHtml();
@@ -2720,7 +2734,7 @@ const actions = {
     const r = await sb.from('parties').select('name').eq('id', id).single();
     if (r.error) return toast(r.error.message);
     if (!act) {
-      const k = await sb.from('skus').select('id', { count: 'exact', head: true }).eq('supplier_id', id).eq('status', 'active');
+      const k = await sb.from('skus').select('id', { count: 'estimated', head: true }).eq('supplier_id', id).eq('status', 'active');
       const n = k.count || 0;
       const note = await askNote(`Deactivate ${r.data.name}? ${n ? n + ' active product(s) (SKUs) still point to this supplier; to move them use Merge, or change them first. ' : ''}It will disappear from this list and stop being re-screened. Nothing is deleted. Why?`, true);
       if (note === null) return;
