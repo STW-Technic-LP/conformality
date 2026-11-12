@@ -48,7 +48,9 @@ main div:has(>table){overflow-x:auto}
 <script>
 // ---- VERSION: increase with every revision (also update the user guide's "applies to") ----
 // 1.11.0 Records shows just "Audit log" when trade compliance is off. Suppliers: Import and Export (CSV) and exception filters. Every page opens with a line saying what is expected.
-//        Every dialog has an X in its corner. Government data: the "Where to update each one" section is gone; Load list is a button on the table row.
+//        Every dialog has an X in its corner. Regulatory data: the "Where to update each one" section is gone; Load list is a button on the table row.
+// 1.15.1 The Open items by severity bar is 75% of its former height (the key sits in one row).
+// 1.15.0 Configuration (wrench) now holds only Features, Organization and User Management. Suppliers, Regulatory data (was Government data) and Audit log are tabs; Trade compliance is a menu (Products, Classifications, Customers, Rules, Customs records). New Organization and User Management pages (database part 15).
 // 1.14.2 Smaller type: body text is 13px and the other sizes scale with it (xs 11, sm 13, base 15, lg 17, xl 19, 2xl 22, 3xl 28; 14px body on screens 1536px and wider).
 // 1.14.1 Dashboard: page title is "Dashboard"; Priority and Issue type filters share one row (chips on wide screens, drop-down lists on small ones); search sits on the row below.
 // 1.14.0 Dashboard redesign: KPI cards (compliance ring, missing CMRT, smelter reviews, open requests), severity bar, and one filterable Requires attention list (priority, issue type, search, expandable rows). CMRT check and By area tiles are folded into it.
@@ -69,24 +71,24 @@ main div:has(>table){overflow-x:auto}
 // 1.8.6  Customs records: search, filter by type, order and keep-until, and sort by clicking any column heading.
 // 1.8.5  Count pill on the Configuration menu button (total of its items). Pills cap at 99+ (title keeps the real number).
 // 1.8.4  Count pills on the Review inbox tabs (Documents, Ownership forms, Screening matches, Document requests) and a total on the Review inbox menu item.
-// 1.8.3  Count pills in the Configuration drop-down for Suppliers, Classifications, Customers, Government data and Rules (overdue or needs-action items only).
+// 1.8.3  Count pills in the Configuration drop-down for Suppliers, Classifications, Customers, Regulatory data and Rules (overdue or needs-action items only).
 // 1.8.2  The order file pop-up fits the screen height: title, progress and Next step stay at the top, the details scroll, and the buttons stay at the bottom (phones included). Other pop-ups scroll instead of running off the screen.
-// 1.8.1  The Data currency panel is off the Dashboard (it lives on Configuration > Government data). The Configuration drop-down shows a count pill on Government data when lists or reviews are overdue.
+// 1.8.1  The Data currency panel is off the Dashboard (it lives on Regulatory data). The Configuration drop-down shows a count pill on Regulatory data when lists or reviews are overdue.
 // 1.8.0  Ownership forms are their own Review inbox item. Customer page (click a name under Configuration > Customers): status tiles, Next step banner and tabs.
 // 1.7.2  The old Trade Compliance page is gone: Orders, Classifications, Customers, Customs records and Rules are separate pages with their own titles (no tab strip).
-// 1.7.1  Loading the screening list and the RMAP smelter list now happens on Configuration > Government data (the review pages show status only).
+// 1.7.1  Loading the screening list and the RMAP smelter list now happens on Regulatory data (the review pages show status only).
 //         Smelter check is renamed CMRT check.
 // 1.7.0  Supplier page (click a supplier's name): status tiles, a Next step banner and tabs for Documents & requests, Smelters, Products, Contacts and History.
 //         The order file starts with a progress strip and a Next step banner.
 // 1.6.0  New menu: Dashboard, Orders, Review inbox (Documents, Screening matches, Document requests, Smelter check), Records, Configuration
-//         (Suppliers, Products, Classifications, Customers, Government data, Rules). Bell shows blocked orders, overdue items and escalations for
+//         (Suppliers, Products, Classifications, Customers, Regulatory data, Rules). Bell shows blocked orders, overdue items and escalations for
 //         everyone. The user icon replaces the name and role. Dashboard has an All filter.
 // 1.5.0  Layout: High/Medium/Low counters sit in a row above the Dashboard. Conflict Minerals is one page with Document requests and
 //         Smelter check as items on it. Icons on menu items and buttons. Sign out, name and role are stacked to save space.
 // 1.4.1  Today is now the Dashboard. It has an Urgent section, the High / Medium / Low cards use the same names as the badges, and clicking a card filters the list.
 // 1.5.1  Menu: Restricted Party Screening is now Party Screening (the page still says restricted party screening in its subtitle).
 // 1.4.0  New menu: Conflict Minerals, Restricted Party Screening, Trade Compliance, Document review, and a Configuration menu
-//         (Suppliers, SKUs, Government data). New Government data page for loading lists and recording reviews.
+//         (Suppliers, SKUs, Regulatory data). New Regulatory data page for loading lists and recording reviews.
 // 1.3.2  Suppliers: Edit, Deactivate / Reactivate, and Merge (admin) so a duplicate or misnamed supplier can be cleaned up. Needs database part 13.
 // 1.3.1  License determination no longer defaults to NLR; the choice is blank unless every item is EAR99.
 // 1.3.0  Today: Data currency panel (when outside data and reviews were last updated, with an "I checked this" record),
@@ -98,7 +100,7 @@ main div:has(>table){overflow-x:auto}
 //        government-contract flags (FAR Part 12 / TAA / BAA), shipment-check levels (Trade > Rules), order file download.
 //        Fixed: date-only values no longer show a day early in US time zones.
 // 1.0.0  First versioned release. Added the user guide link.
-const APP_VERSION = '1.14.2';
+const APP_VERSION = '1.15.1';
 // ---- CONFIG: paste your Supabase project values -------------------------------
 const CFG = {
   url: 'https://sjwarllnehssyphoormc.supabase.co',                    // https://xxxx.supabase.co
@@ -193,13 +195,16 @@ function askNote(title, required) {
 // ---- shell -------------------------------------------------------------------
 // Conflict minerals topics come first in every menu; trade compliance (EAR/ITAR) topics follow under a heading.
 // Feature flags (Configuration > Features) remove the trade or screening items; see buildNav().
+// Configuration (wrench icon) holds only Features, Organization and User Management.
 let FEAT = { trade: true, screening: true };
-const SEP = ['--', 'Trade compliance'];
 const NAV_ALL = [
   { id: 'today', label: 'Dashboard', icon: 'dashboard', v: 'today' },
+  { id: 'suppliers', label: 'Suppliers', icon: 'building', v: 'suppliers' },
   { id: 'orders', label: 'Orders', icon: 'package', v: 'trade', t: 'orders', trade: true },
-  { label: 'Configuration', icon: 'sliders', items: [['suppliers', 'Suppliers', 'building'], ['govdata', 'Government data', 'landmark'], ['features', 'Features', 'sliders'], SEP, ['skus', 'Products (SKUs)', 'tag'], ['trade', 'Classifications', 'filecheck', 'class'], ['trade', 'Customers', 'users', 'parties'], ['trade', 'Rules', 'sliders', 'dest']] },
-  { label: 'Records', icon: 'scroll', items: [['audit', 'Audit log', 'scroll'], SEP, ['trade', 'Customs records', 'filetext', 'records']] }
+  { label: 'Trade compliance', icon: 'filecheck', trade: true, items: [['skus', 'Products (SKUs)', 'tag'], ['trade', 'Classifications', 'filecheck', 'class'], ['trade', 'Customers', 'users', 'parties'], ['trade', 'Rules', 'sliders', 'dest'], ['trade', 'Customs records', 'filetext', 'records']] },
+  { id: 'govdata', label: 'Regulatory data', icon: 'landmark', v: 'govdata' },
+  { id: 'audit', label: 'Audit log', icon: 'scroll', v: 'audit' },
+  { label: 'Configuration', icon: 'wrench', cfg: true, items: [['features', 'Features', 'sliders'], ['organization', 'Organization', 'building'], ['users', 'User Management', 'users']] }   // behind the wrench icon, not in the tab strip
 ];
 const OLD_VIEWS = ['review', 'requests', 'minerals', 'ownership', 'screening'];   // pages that were folded into the supplier/customer pages and the Dashboard (1.10.0)
 const isTradeView = (v) => v === 'trade' || v === 'customer' || v === 'skus';
@@ -242,7 +247,7 @@ function popMenu(key, selector, html, width) {
 }
 // ---- bell: blocked orders, overdue items and escalations (everyone's, whatever the role) ------------------
 let workCache = null;   // { at, rows, cur } from v_open_work and v_data_currency
-const RULE_SOURCES = ['destinations', 'eus_wording'];   // reviews that belong to Configuration > Rules; the rest belong to Government data
+const RULE_SOURCES = ['destinations', 'eus_wording'];   // reviews that belong to Configuration > Rules; the rest belong to Regulatory data
 const overdueData = (rules) => ((workCache && workCache.cur) || []).filter((r) => r.status === 'overdue' && RULE_SOURCES.includes(r.code) === !!rules).length;
 // Count shown beside a Configuration item: things in that area that are overdue or need action.
 const pillHtml = (n) => n ? `<span class="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800" title="${n} need attention">${n > 99 ? '99+' : n}</span>` : '';
@@ -281,7 +286,7 @@ function bellHtml() {
 function paintBell() {
   const el = document.getElementById('bellCount'); if (!el) return;
   const n = bellCount(); el.textContent = n > 99 ? '99+' : String(n); el.classList.toggle('hidden', !n);
-  document.querySelectorAll('[data-pillfor]').forEach((e) => { e.innerHTML = /^g\d+$/.test(e.dataset.pillfor) ? pillHtml(groupTotal(NAV[+e.dataset.pillfor.slice(1)])) : ''; });
+  document.querySelectorAll('[data-pillfor]').forEach((e) => { const p = e.dataset.pillfor; e.innerHTML = /^g\d+$/.test(p) ? pillHtml(groupTotal(NAV[+p.slice(1)] || {})) : p.startsWith('m:') ? pillHtml(menuCount(p.split(':')[1], p.split(':')[2])) : ''; });
   const m = document.getElementById('navmenu'); if (m && m.dataset.g === 'bell') m.innerHTML = bellHtml();
 }
 async function refreshBell(force) {
@@ -293,13 +298,13 @@ async function refreshBell(force) {
 function shell(inner) {
   closeNavMenu();
   const cls = (on) => on ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-200';
-  const group = (n, gi) => `<button data-a="menu" data-g="${gi}" aria-haspopup="true" class="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg whitespace-nowrap shrink-0 ${cls(navOn(n))}">${ico(n.icon)}${n.label}${n.label === 'Configuration' ? `<span data-pillfor="g${gi}">${pillHtml(groupTotal(n))}</span>` : ''} <span class="text-xs opacity-70">&#9662;</span></button>`;
-  const tab = (n) => `<button data-a="nav" data-v="${n.v}" ${n.t ? `data-t="${n.t}"` : ''} class="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg whitespace-nowrap shrink-0 ${cls(navOn(n))}">${ico(n.icon)}${n.label}</button>`;
+  const group = (n, gi) => `<button data-a="menu" data-g="${gi}" aria-haspopup="true" class="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg whitespace-nowrap shrink-0 ${cls(navOn(n))}">${ico(n.icon)}${n.label}<span data-pillfor="g${gi}">${pillHtml(groupTotal(n))}</span> <span class="text-xs opacity-70">&#9662;</span></button>`;
+  const tab = (n) => `<button data-a="nav" data-v="${n.v}" ${n.t ? `data-t="${n.t}"` : ''} class="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg whitespace-nowrap shrink-0 ${cls(navOn(n))}">${ico(n.icon)}${n.label}<span data-pillfor="m:${n.v}:${n.t || ''}">${pillHtml(menuCount(n.v, n.t))}</span></button>`;
   const iconBtn = 'relative inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-300 bg-white text-slate-700 hover:bg-slate-100';
   const nb = bellCount();
   // Configuration lives behind the wrench icon (left of the bell and the user icon), not in the tab strip.
-  const cfgI = NAV.findIndex((n) => n.label === 'Configuration' && n.items), cfgOn = cfgI >= 0 && navOn(NAV[cfgI]);
-  const cfgBtn = cfgI < 0 ? '' : `<button id="cfgBtn" data-a="menu" data-g="${cfgI}" aria-haspopup="true" aria-label="Settings" title="Settings (Configuration)" class="${cfgOn ? 'relative inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-900 bg-slate-900 text-white hover:bg-slate-800' : iconBtn}">${ico('wrench', 'h-5 w-5')}<span data-pillfor="g${cfgI}" class="absolute -top-2 -right-2">${pillHtml(groupTotal(NAV[cfgI]))}</span></button>`;
+  const cfgI = NAV.findIndex((n) => n.cfg && n.items), cfgOn = cfgI >= 0 && navOn(NAV[cfgI]);
+  const cfgBtn = cfgI < 0 ? '' : `<button id="cfgBtn" data-a="menu" data-g="${cfgI}" aria-haspopup="true" aria-label="Configuration" title="Configuration" class="${cfgOn ? 'relative inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-900 bg-slate-900 text-white hover:bg-slate-800' : iconBtn}">${ico('wrench', 'h-5 w-5')}</button>`;
   $('#app').innerHTML = `
   <header id="topbar" class="bg-white border-b border-slate-200"><div class="max-w-[1920px] mx-auto px-4 lg:px-8 py-2.5 flex items-center gap-3 flex-wrap">
     <div class="font-semibold tracking-tight mr-4">Conformality <span class="text-xs font-normal text-slate-400">v${APP_VERSION}</span></div>
@@ -332,7 +337,7 @@ const CATS = {
   req: ['Open requests', 'send', 'bg-blue-50 text-blue-600'], scr: ['Screening', 'target', 'bg-slate-100 text-slate-600'],
   docs: ['Documents to review', 'filecheck', 'bg-slate-100 text-slate-600'], own: ['Ownership forms', 'building', 'bg-slate-100 text-slate-600'],
   ord: ['Orders', 'package', 'bg-slate-100 text-slate-600'], cls: ['Classification', 'tag', 'bg-slate-100 text-slate-600'],
-  eus: ['End user statements', 'filetext', 'bg-slate-100 text-slate-600'], dat: ['Government data', 'landmark', 'bg-slate-100 text-slate-600'],
+  eus: ['End user statements', 'filetext', 'bg-slate-100 text-slate-600'], dat: ['Regulatory data', 'landmark', 'bg-slate-100 text-slate-600'],
   oth: ['Other', 'list', 'bg-slate-100 text-slate-600']
 };
 const areaOf = (w) => w.kind === 'document_review' ? 'docs' : /^request_/.test(w.kind) ? 'req' : w.kind === 'missing_cmrt' ? 'cmrt'
@@ -431,10 +436,10 @@ function paintDash() {
         ${kpi('smr', 'shield', 'bg-amber-50 text-amber-500', 'Smelter reviews', smrParty, 'Suppliers requiring review')}
         ${kpi('req', 'send', 'bg-blue-50 text-blue-500', 'Open requests', nCat.req || 0, 'Awaiting supplier response')}
       </div>
-      <div class="${card} grid items-center gap-4 px-5 py-4 lg:grid-cols-[auto_minmax(0,1fr)_auto] lg:gap-6">
+      <div class="${card} grid items-center gap-3 px-5 py-3 lg:grid-cols-[auto_minmax(0,1fr)_auto] lg:gap-6">
         <div><div class="flex items-center gap-2 text-lg font-semibold text-slate-900">Open items by severity <span title="Every open item, grouped by its High / Medium / Low priority." class="text-slate-500">${ico('info', 'h-5 w-5')}</span></div><div class="text-lg font-semibold text-blue-700">${total} total</div></div>
-        <div class="flex h-9 overflow-hidden rounded-full ${total ? 'bg-slate-200' : 'bg-emerald-100'}">${total ? seg('high', 'bg-red-600 text-white') + seg('medium', 'bg-amber-400 text-slate-900') + seg('low', 'bg-slate-300 text-slate-700') : '<div class="flex w-full items-center justify-center text-sm font-semibold text-emerald-800">All clear</div>'}</div>
-        <div class="grid gap-1 lg:border-l lg:border-slate-200 lg:pl-6">${lg('high', 'bg-red-600')}${lg('medium', 'bg-amber-400')}${lg('low', 'bg-slate-300')}</div>
+        <div class="flex h-[27px] overflow-hidden rounded-full ${total ? 'bg-slate-200' : 'bg-emerald-100'}">${total ? seg('high', 'bg-red-600 text-white') + seg('medium', 'bg-amber-400 text-slate-900') + seg('low', 'bg-slate-300 text-slate-700') : '<div class="flex w-full items-center justify-center text-sm font-semibold text-emerald-800">All clear</div>'}</div>
+        <div class="flex flex-wrap gap-x-4 gap-y-1 lg:border-l lg:border-slate-200 lg:pl-6">${lg('high', 'bg-red-600')}${lg('medium', 'bg-amber-400')}${lg('low', 'bg-slate-300')}</div>
       </div>
       <section id="dashAttn" class="${card} p-5">
         <div class="flex flex-wrap items-center justify-between gap-4"><div class="flex items-center gap-4"><span class="flex h-12 w-12 items-center justify-center rounded-xl bg-red-50 text-red-600">${ico('alert', 'h-7 w-7')}</span><div><h2 class="text-2xl font-bold tracking-tight text-slate-900">Requires attention</h2><p class="text-slate-600">${total ? `Review and address the ${total} open compliance item${total > 1 ? 's' : ''}.` : 'Nothing is open.'}</p></div></div>
@@ -481,7 +486,7 @@ function currencyPanel(rows, forceOpen) {
     return `<tr class="align-top"><td class="py-2 pr-3"><div class="font-medium">${esc(r.label)}</div><div class="text-xs text-slate-500">${r.is_auto ? 'Loaded from a file' : 'Checked by a person'} · every ${r.cadence_days} days</div></td>
       <td class="py-2 pr-3 whitespace-nowrap">${r.last_at ? fmt(r.last_at) : '-'}</td><td class="py-2 pr-3 whitespace-nowrap">${r.due_on ? fmt(r.due_on) : '-'}</td><td class="py-2 pr-3">${badge(txt, tone)}</td><td class="py-2 text-right">${act}</td></tr>`;
   };
-  return `<details class="rounded-xl bg-white border border-slate-200 mb-4" ${bad || forceOpen ? 'open' : ''}><summary class="cursor-pointer select-none p-4 flex items-center gap-3"><span class="font-medium">Data currency</span>${bad ? badge(bad + ' to update', 'amber') : badge('All current', 'green')}<span class="text-xs text-slate-500 ml-auto">Government data and reviews</span></summary>
+  return `<details class="rounded-xl bg-white border border-slate-200 mb-4" ${bad || forceOpen ? 'open' : ''}><summary class="cursor-pointer select-none p-4 flex items-center gap-3"><span class="font-medium">Data currency</span>${bad ? badge(bad + ' to update', 'amber') : badge('All current', 'green')}<span class="text-xs text-slate-500 ml-auto">Regulatory data and reviews</span></summary>
     <div class="px-4 pb-3 overflow-x-auto"><table class="w-full text-sm"><thead class="text-left text-slate-500 border-b border-slate-200"><tr><th class="py-2 pr-3">What</th><th class="py-2 pr-3">Last updated</th><th class="py-2 pr-3">Next due</th><th class="py-2 pr-3">Status</th><th></th></tr></thead><tbody class="divide-y divide-slate-100">${rows.map(row).join('')}</tbody></table></div></details>`;
 }
 async function dataCheckModal(code) {
@@ -509,7 +514,7 @@ async function renderGovData() {
   loading();
   const cu = await sb.from('v_data_currency').select('*').order('sort_order');
   const rows = cu.error ? null : curSort(cu.data);
-  shell(`<h2 class="text-xl font-semibold mb-1">Government data</h2>
+  shell(`<h2 class="text-xl font-semibold mb-1">Regulatory data</h2>
     <p class="text-sm text-slate-500 mb-4">The outside lists and rules this app depends on, and when each was last updated. Expected: every row is <b>Current</b>. Use <b>Load list</b> to load a downloaded file (the smelter list and the screening list), or <b>I checked this</b> to record a review of a rule or notice that has no file. The Dashboard reminds you when something is due.</p>
     ${rows === null ? '<div class="rounded-xl border border-dashed border-slate-300 p-3 text-sm text-slate-500">Data currency is not set up yet. Run database part 11 to see when screening lists, tariff data and reviews are due, and to load lists from here.</div>' : currencyPanel(rows, true)}`);
   if ($('#rmapFile')) $('#rmapFile').onchange = (e) => { importRmap(e.target.files[0]); e.target.value = ''; };
@@ -518,8 +523,8 @@ async function renderGovData() {
 
 // ---- features (feature flags) --------------------------------------------------------------
 const FEATURES = [
-  { key: 'feature_trade_compliance', id: 'trade', name: 'Trade compliance (EAR / ITAR)', hides: 'Orders, Products (SKUs) (including the Products tab and product count on supplier pages), Classifications, Customers and their end user statements, Rules (destination countries and check levels), Customs records, and the tariff and export-control rows under Government data.', keeps: 'Suppliers, document requests, CMRT checks and the smelter list (conflict minerals), and the Audit log.' },
-  { key: 'feature_party_screening', id: 'screening', name: 'Restricted party screening and ownership reviews', hides: 'Screening matches, Ownership forms, the screening list under Government data, and the screening tile on supplier pages.', keeps: 'Everything else. This must stay on while trade compliance is on, because orders are screened.' }
+  { key: 'feature_trade_compliance', id: 'trade', name: 'Trade compliance (EAR / ITAR)', hides: 'Orders, Products (SKUs) (including the Products tab and product count on supplier pages), Classifications, Customers and their end user statements, Rules (destination countries and check levels), Customs records, and the tariff and export-control rows under Regulatory data.', keeps: 'Suppliers, document requests, CMRT checks and the smelter list (conflict minerals), and the Audit log.' },
+  { key: 'feature_party_screening', id: 'screening', name: 'Restricted party screening and ownership reviews', hides: 'Screening matches, Ownership forms, the screening list under Regulatory data, and the screening tile on supplier pages.', keeps: 'Everything else. This must stay on while trade compliance is on, because orders are screened.' }
 ];
 async function renderFeatures() {
   loading(); await loadFeatures();
@@ -534,6 +539,31 @@ async function renderFeatures() {
   shell(`<h2 class="text-xl font-semibold mb-1">Features</h2>
     <p class="text-sm text-slate-500 mb-4">Conflict minerals compliance is always on. Turn on only the compliance areas your company needs. Turning something off hides it and stops new records being created; nothing is deleted, and turning it back on restores everything. Every change is recorded in the Audit log.${admin ? '' : ' Only an admin can change these settings.'}</p>
     <div class="grid gap-3 max-w-4xl"><div class="rounded-xl bg-white border border-slate-200 p-4"><div class="flex items-center gap-2"><span class="font-medium">Conflict minerals (suppliers, requests, CMRT, smelters)</span>${badge('Always on', 'green')}</div></div>${FEATURES.map(row).join('')}</div>`);
+}
+
+// ---- Organization and User Management (Configuration) -------------------------------------------
+async function renderOrganization() {
+  loading();
+  const admin = profile?.role === 'admin', r = await sb.from('app_settings').select('value').eq('key', 'company_name').maybeSingle();
+  const name = r.data && r.data.value != null ? String(r.data.value).replace(/^"|"$/g, '') : '';
+  shell(`<h2 class="text-xl font-semibold mb-1">Organization</h2>
+    <p class="text-sm text-slate-500 mb-4">Details about your company. The company name appears on the audit report.${admin ? '' : ' Only an admin can change these.'}</p>
+    <div class="rounded-xl bg-white border border-slate-200 p-4 max-w-xl"><label class="block text-sm font-medium">Company name<input id="orgName" value="${esc(name)}" maxlength="120" ${admin ? '' : 'disabled'} class="${inp}"></label>
+      <p id="orgErr" class="text-sm text-red-600 mt-2 min-h-[1.25rem]"></p>${admin ? `<div class="flex justify-end">${btn('Save', 'saveOrg', {}, 'primary')}</div>` : ''}</div>`);
+}
+const ROLES = ['admin', 'editor', 'viewer'], ROLE_TONE = { admin: 'red', editor: 'amber', viewer: 'gray' };
+let userRows = [];
+async function renderUsers() {
+  loading();
+  const admin = profile?.role === 'admin', r = await sb.from('profiles').select('*').order('full_name', { ascending: true });
+  if (r.error) return fail(r.error);
+  userRows = r.data || [];
+  const row = (u) => `<tr class="border-t border-slate-100"><td class="p-3 font-medium">${esc(u.full_name || '(no name)')}${u.id === user?.id ? ' <span class="text-xs text-slate-400">(you)</span>' : ''}${u.email ? `<div class="text-xs font-normal text-slate-500">${esc(u.email)}</div>` : ''}</td>
+    <td class="p-3">${badge(u.role || 'viewer', ROLE_TONE[u.role] || 'gray')}</td><td class="p-3">${badge(u.active === false ? 'Off' : 'Active', u.active === false ? 'gray' : 'green')}</td>
+    <td class="p-3 text-right">${admin ? btn('Edit', 'userEdit', { id: u.id }, 'ghost') : ''}</td></tr>`;
+  shell(`<h2 class="text-xl font-semibold mb-1">User Management</h2>
+    <p class="text-sm text-slate-500 mb-4">Who can sign in and what they can do. <b>Admin</b>: everything, including configuration, rules and ITAR approvals. <b>Editor</b>: does the work and releases orders. <b>Viewer</b>: read-only.${admin ? ' New people are added in Supabase (Authentication > Users, then database/02_add_user.sql); here you change a role or turn someone off.' : ' Only an admin can change these.'}</p>
+    <div class="rounded-xl bg-white border border-slate-200 overflow-x-auto max-w-4xl"><table class="w-full text-sm"><thead class="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500"><tr><th class="p-3">Name</th><th class="p-3">Role</th><th class="p-3">Status</th><th class="p-3"></th></tr></thead><tbody>${userRows.map(row).join('') || '<tr><td class="p-3 text-slate-500" colspan="4">No users found.</td></tr>'}</tbody></table></div>`);
 }
 
 let supF = { q: '', ex: '' };   // Suppliers list: search text and the one exception filter that is on ('' = all)
@@ -733,7 +763,7 @@ async function renderSupplier() {
     const seen = new Set(), rows = [...(h1.data || []), ...(h2.data || [])].filter((r) => !seen.has(r.id) && seen.add(r.id)).sort((a, b) => b.id - a.id).slice(0, 25);
     body = card('History', rows.length ? rows.map((r) => `<div class="px-4 py-3 border-t border-slate-100 first:border-t-0 text-sm"><div class="flex flex-wrap items-center gap-2"><b>${esc(auditWhen(r.at))}</b><span class="text-slate-500">${esc(auditWho(r))}</span>${badge(AUD_ACT[r.action] || r.action, r.action === 'delete' ? 'red' : r.action === 'update' ? 'amber' : 'gray')}<span class="text-slate-500">${esc(AUD_AREA[r.table_name] || r.table_name)}</span></div><div class="text-slate-600 mt-0.5">${esc(auditSummary(r))}</div></div>`).join('') + `<div class="px-4 py-3 border-t border-slate-200 text-xs text-slate-500">The latest 25 changes. The full record is under Records › Audit log.</div>` : none('No recorded changes yet.'));
   }
-  shell(`<div class="text-xs text-slate-500 mb-2">Configuration › ${btn('Suppliers', 'nav', { v: 'suppliers' }, 'ghost').replace('px-3 py-1.5', 'px-2 py-0.5')}</div>
+  shell(`<div class="text-xs text-slate-500 mb-2">${btn('Suppliers', 'nav', { v: 'suppliers' }, 'ghost').replace('px-3 py-1.5', 'px-2 py-0.5')}</div>
     <div class="flex flex-wrap items-center gap-3"><h1 class="text-2xl font-semibold">${esc(name)}</h1>${next.tone === 'green' ? badge('In good standing', 'green') : badge('Action needed', next.tone === 'red' ? 'red' : 'amber')}${c.party.is_active === false ? badge('Inactive', 'gray') : ''}<span class="text-sm text-slate-500">${esc(c.party.country || '')} · ${c.skus.filter((k) => k.status === 'active').length} active products</span>
       <div class="ml-auto flex flex-wrap gap-2">${btn('Edit', 'editSupplier', { id }, 'ghost')}${btn('Request documents', 'reqDocs', { id, name })}</div></div>
     <p class="mt-3 text-sm text-slate-500">Everything about this supplier. Expected: a contact on file, a current conflict minerals form with no flagged smelters, no overdue requests${FEAT.screening ? ' and a clear restricted party screening' : ''}. The Next step box shows what to do first.</p>
@@ -812,7 +842,7 @@ async function renderCustomer() {
     const seen = new Set(), rows = [...(h1.data || []), ...(h2.data || [])].filter((r) => !seen.has(r.id) && seen.add(r.id)).sort((a, b) => b.id - a.id).slice(0, 25);
     body = card('History', rows.length ? rows.map((r) => `<div class="px-4 py-3 border-t border-slate-100 first:border-t-0 text-sm"><div class="flex flex-wrap items-center gap-2"><b>${esc(auditWhen(r.at))}</b><span class="text-slate-500">${esc(auditWho(r))}</span>${badge(AUD_ACT[r.action] || r.action, r.action === 'delete' ? 'red' : r.action === 'update' ? 'amber' : 'gray')}<span class="text-slate-500">${esc(AUD_AREA[r.table_name] || r.table_name)}</span></div><div class="text-slate-600 mt-0.5">${esc(auditSummary(r))}</div></div>`).join('') + `<div class="px-4 py-3 border-t border-slate-200 text-xs text-slate-500">The latest 25 changes. The full record is under Records › Audit log.</div>` : none('No recorded changes yet.'));
   }
-  shell(`<div class="text-xs text-slate-500 mb-2">Configuration › ${btn('Customers', 'nav', { v: 'trade', t: 'parties' }, 'ghost').replace('px-3 py-1.5', 'px-2 py-0.5')}</div>
+  shell(`<div class="text-xs text-slate-500 mb-2">Trade compliance › ${btn('Customers', 'nav', { v: 'trade', t: 'parties' }, 'ghost').replace('px-3 py-1.5', 'px-2 py-0.5')}</div>
     <div class="flex flex-wrap items-center gap-3"><h1 class="text-2xl font-semibold">${esc(name)}</h1>${next.tone === 'green' ? badge('In good standing', 'green') : badge('Action needed', next.tone === 'red' ? 'red' : 'amber')}${c.party.is_active === false ? badge('Inactive', 'gray') : ''}<span class="text-sm text-slate-500">${esc((c.party.roles || []).map((r) => (PARTY_ROLES.find((x) => x[0] === r) || [0, r])[1]).join(', '))}${c.party.country ? ' · ' + esc(c.party.country) : ''}</span>
       <div class="ml-auto flex flex-wrap gap-2">${btn('Edit', 'editParty', { id }, 'ghost')}${isCust ? btn('Manage contact', 'addContact', { id, name }, 'ghost') + btn('End user statement', 'eus', { id, name }) : btn('Manage contact', 'addContact', { id, name }, 'ghost')}</div></div>
     <p class="mt-3 text-sm text-slate-500">Everything about this customer or other party. Expected: a clear restricted party screening, and for a customer a current signed end user statement, before its orders can ship. The Next step box shows what to do first.</p>
@@ -990,8 +1020,8 @@ async function renderMinerals() {
   <p class="text-sm text-slate-500 mb-3">Reads the conflict minerals forms (CMRTs) suppliers send in and checks each declared smelter against the RMAP list.</p>
   <div class="rounded-xl bg-white border border-slate-200 p-4 mb-6 flex flex-wrap items-center gap-3">
     <div class="flex-1 min-w-[14rem]"><div class="font-medium">RMAP smelter list</div>
-    <div class="text-sm text-slate-500">${last ? `Loaded ${fmt(last.loaded_at)} · ${last.row_count} smelters` : 'Not loaded yet. Load the latest RMAP smelter list under Configuration › Government data.'}</div></div>
-    ${btn('Update in Government data', 'nav', { v: 'govdata' }, 'ghost')}</div>
+    <div class="text-sm text-slate-500">${last ? `Loaded ${fmt(last.loaded_at)} · ${last.row_count} smelters` : 'Not loaded yet. Load the latest RMAP smelter list under Configuration › Regulatory data.'}</div></div>
+    ${btn('Update in Regulatory data', 'nav', { v: 'govdata' }, 'ghost')}</div>
   <h3 class="font-semibold mb-2">CMRTs waiting to be read</h3>
   <div class="rounded-xl bg-white border border-slate-200 divide-y divide-slate-100 mb-6">${pending.map((d) => `<div class="p-4 flex items-center gap-3"><div class="flex-1"><div class="font-medium">${esc(d.title)}</div><div class="text-sm text-slate-500">${esc(d.party?.name)} · ${esc(d.status.replace('_', ' '))}</div></div>${btn('Read & check smelters', 'parse', { id: d.id })}</div>`).join('') || '<p class="p-6 text-center text-slate-500">Nothing waiting. Uploaded CMRTs appear here.</p>'}</div>
   ${declSection(decl.data)}`);
@@ -1170,7 +1200,7 @@ async function renderScreening() {
   <div class="rounded-xl bg-white border border-slate-200 p-4 mb-6">
     <div class="flex flex-wrap items-center gap-3"><div class="flex-1 min-w-[14rem]"><div class="font-medium">Screening lists ${stale ? badge('Out of date', 'red') : ''}</div>
     <div class="text-sm text-slate-500">${last ? `Loaded ${fmt(last.loaded_at)} · ${(last.row_count || 0).toLocaleString()} entries` : 'No list loaded yet. Screening cannot run until one is.'}</div></div>
-    ${btn('Update in Government data', 'nav', { v: 'govdata' }, 'ghost')}</div>
+    ${btn('Update in Regulatory data', 'nav', { v: 'govdata' }, 'ghost')}</div>
     ${chips ? `<div class="mt-3 flex flex-wrap gap-1.5">${chips}</div>` : ''}
     <p class="text-xs text-slate-500 mt-3">Download the Consolidated Screening List CSV from <a class="underline" target="_blank" rel="noopener" href="https://www.trade.gov/consolidated-screening-list">trade.gov</a>. It combines the OFAC, BIS and State Department lists and is updated daily. Load a fresh copy at least every couple of weeks. Each load keeps the original file with its fingerprint as evidence of what the list said that day.</p></div>
   <h3 class="font-semibold mb-2">Possible matches to review (${hi.data.length})</h3>
@@ -2096,7 +2126,7 @@ const actions = {
   screenNow: async ({ id }) => {
     toast('Screening…');
     const r = await sb.rpc('screen_party', { p_party: id });
-    if (r.error) return toast(/No screening lists/.test(r.error.message) ? 'No screening list is loaded yet. Load one under Configuration > Government data first.' : r.error.message);
+    if (r.error) return toast(/No screening lists/.test(r.error.message) ? 'No screening list is loaded yet. Load one under Regulatory data first.' : r.error.message);
     const s = await sb.from('screenings').select('result').eq('id', r.data).single();
     if (s.data?.result === 'clear') { toast('Screened: no matches.'); route(); } else { toast('Possible matches found. Open the party to review them.'); route(); }
   },
@@ -2128,7 +2158,7 @@ const actions = {
   screenOrder: async ({ id }) => {
     toast('Screening order…');
     const r = await sb.rpc('screen_transaction', { p_tx: id });
-    if (r.error) return ($('#fErr') ? ($('#fErr').textContent = /No screening lists/.test(r.error.message) ? 'No screening list is loaded yet. Load one under Configuration > Government data first.' : r.error.message) : toast(r.error.message));
+    if (r.error) return ($('#fErr') ? ($('#fErr').textContent = /No screening lists/.test(r.error.message) ? 'No screening list is loaded yet. Load one under Regulatory data first.' : r.error.message) : toast(r.error.message));
     if (view === 'trade' || view === 'customer') route(); else if (view === 'today') route(); openOrder(id);
   },
   orderDecide: ({ id, d }) => modal(`<h3 class="text-lg font-semibold">${d === 'cleared' ? 'Release this order' : 'Block this order'}</h3>
@@ -2276,6 +2306,30 @@ const actions = {
   },
   recSort: ({ k }) => { recF.dir = recF.sort === k ? -recF.dir : (k === 'date' || k === 'keep' ? -1 : 1); recF.sort = k; renderTrade(); },
   recClear: () => { recF = { q: '', type: '', order: '', keep: '', sort: recF.sort, dir: recF.dir }; renderTrade(); },
+  saveOrg: async () => {
+    const v = ($('#orgName').value || '').trim(); if (!v) return ($('#orgErr').textContent = 'Enter the company name.');
+    const r = await sb.from('app_settings').upsert({ key: 'company_name', value: v }, { onConflict: 'key' }).select('key');
+    if (r.error || !r.data || !r.data.length) return ($('#orgErr').textContent = 'Could not save. Run database part 15 (admin access to settings and users) and try again.');
+    toast('Saved.');
+  },
+  userEdit: ({ id }) => {
+    const u = userRows.find((x) => x.id === id); if (!u) return;
+    modal(`<h3 class="text-lg font-semibold">Edit user</h3>
+      <label class="block mt-3 text-sm">Name<input id="uName" value="${esc(u.full_name || '')}" maxlength="120" class="${inp}"></label>
+      <label class="block mt-3 text-sm">Role<select id="uRole" class="${inp}">${ROLES.map((x) => `<option ${x === u.role ? 'selected' : ''}>${x}</option>`).join('')}</select></label>
+      <label class="mt-3 flex items-center gap-2 text-sm"><input id="uActive" type="checkbox" ${u.active === false ? '' : 'checked'}> Active (can sign in)</label>
+      <p id="uErr" class="text-sm text-red-600 mt-2 min-h-[1.25rem]"></p>
+      <div class="mt-2 flex justify-end gap-2">${btn('Cancel', 'close', {}, 'ghost')}${btn('Save', 'userSave', { id }, 'primary')}</div>`);
+  },
+  userSave: async ({ id }) => {
+    const role = $('#uRole').value, active = $('#uActive').checked, full_name = ($('#uName').value || '').trim();
+    const others = userRows.filter((x) => x.id !== id && x.role === 'admin' && x.active !== false).length;
+    if (id === user?.id && (role !== 'admin' || !active)) return ($('#uErr').textContent = 'You cannot remove your own admin access. Ask another admin.');
+    if (!others && (role !== 'admin' || !active)) return ($('#uErr').textContent = 'Keep at least one active admin.');
+    const r = await sb.from('profiles').update({ role, active, full_name }).eq('id', id).select('id');
+    if (r.error || !r.data || !r.data.length) return ($('#uErr').textContent = 'Could not save. Run database part 15 (admin access to settings and users) and try again.');
+    closeModal(); toast('Saved.'); route();
+  },
   featureAsk: ({ k, on }) => {
     const f = FEATURES.find((x) => x.key === k); if (!f) return;
     modal(`<h3 class="text-lg font-semibold">${on === '1' ? 'Turn on' : 'Turn off'} ${f.name}?</h3>
@@ -2560,7 +2614,7 @@ document.addEventListener('change', (e) => {
 });
 
 // ---- boot & auth ---------------------------------------------------------------
-function route() { if (OLD_VIEWS.includes(view) || !viewAllowed(view)) { view = 'today'; tradeTab = 'orders'; } ({ features: renderFeatures, ownership: renderOwnership, customer: renderCustomer, today: renderToday, suppliers: renderSuppliers, supplier: renderSupplier, skus: renderSkus, requests: renderRequests, minerals: renderMinerals, screening: renderScreening, trade: renderTrade, review: renderReview, audit: renderAudit, govdata: renderGovData })[view](); }
+function route() { if (OLD_VIEWS.includes(view) || !viewAllowed(view)) { view = 'today'; tradeTab = 'orders'; } ({ features: renderFeatures, organization: renderOrganization, users: renderUsers, ownership: renderOwnership, customer: renderCustomer, today: renderToday, suppliers: renderSuppliers, supplier: renderSupplier, skus: renderSkus, requests: renderRequests, minerals: renderMinerals, screening: renderScreening, trade: renderTrade, review: renderReview, audit: renderAudit, govdata: renderGovData })[view](); }
 
 function loginScreen(msg = '') {
   $('#app').innerHTML = `<div class="min-h-screen grid place-items-center p-4"><form id="lf" class="w-full max-w-sm rounded-2xl bg-white border border-slate-200 shadow-sm p-8">
